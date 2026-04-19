@@ -186,14 +186,38 @@ export default function AdminPage({ config, onLogout }: Props) {
       </div>
       <div className="bg-surface rounded border border-border-dark overflow-hidden">
         <table className="w-full text-left">
+          <thead className="bg-black/40 border-b border-border-dark">
+            <tr>
+              <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Participant</th>
+              <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Department</th>
+              <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Score</th>
+              <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Timestamp</th>
+              <th className="p-4 w-16"></th>
+            </tr>
+          </thead>
           <tbody className="divide-y divide-border-dark/50">
             {submissions.map((s) => (
               <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
                 <td className="p-4">
                   <div className="text-white font-serif italic text-sm">{s.fullName}</div>
+                  <div className="text-[10px] text-[#888888] font-mono mt-0.5">{s.email}</div>
+                </td>
+                <td className="p-4">
+                  <span className="text-[#888888] text-xs uppercase tracking-[1px]">{s.department}</span>
+                </td>
+                <td className="p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-serif text-lg text-white">{s.score}</span>
+                    <span className="text-[#444444] text-sm">/ {s.totalQuestions}</span>
+                  </div>
+                </td>
+                <td className="p-4">
+                  <div className="text-[#888888] text-xs font-mono">
+                    {s.timestamp?.toDate ? format(s.timestamp.toDate(), "MMM dd, yyyy HH:mm") : "Pending..."}
+                  </div>
                 </td>
                 <td className="p-4 text-right">
-                  <button onClick={() => deleteDoc(doc(db, "submissions", s.id!))} className="p-2 text-red-900 opacity-0 group-hover:opacity-100 hover:bg-red-950/20 rounded">
+                  <button onClick={() => deleteDoc(doc(db, "submissions", s.id!))} className="p-2 text-red-900 opacity-0 group-hover:opacity-100 hover:bg-red-950/20 rounded transition-all">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </td>
