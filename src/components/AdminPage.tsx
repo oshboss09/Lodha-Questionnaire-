@@ -69,7 +69,7 @@ export default function AdminPage({ config, onLogout }: Props) {
       return [
         s.fullName,
         s.department,
-        `${s.score}/${s.totalQuestions}`,
+        `\t${s.score}/${s.totalQuestions}`,
         ts
       ];
     });
