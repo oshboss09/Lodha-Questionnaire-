@@ -16,9 +16,25 @@ export default function ResultsPage({ user, config }: Props) {
   const percentage = Math.round((score / total) * 100);
   
   const getFeedback = () => {
-    if (percentage >= 80) return { title: "Commanding Performance", color: "text-gold", desc: "You have demonstrated exceptional expertise and clarity." };
-    if (percentage >= 50) return { title: "Evaluation Complete", color: "text-white", desc: "You have successfully cleared the assessment criteria." };
-    return { title: "Criteria Not Met", color: "text-[#888888]", desc: "Additional evaluation or preparation is recommended." };
+    if (percentage >= (config.excellentThreshold || 80)) {
+      return { 
+        title: config.excellentTitle || "Commanding Performance", 
+        color: "text-gold", 
+        desc: config.excellentDesc || "You have demonstrated exceptional expertise and clarity." 
+      };
+    }
+    if (percentage >= (config.passThreshold || 50)) {
+      return { 
+        title: config.passTitle || "Evaluation Complete", 
+        color: "text-white", 
+        desc: config.passDesc || "You have successfully cleared the assessment criteria." 
+      };
+    }
+    return { 
+      title: config.failTitle || "Criteria Not Met", 
+      color: "text-[#888888]", 
+      desc: config.failDesc || "Additional evaluation or preparation is recommended." 
+    };
   };
 
   const feedback = getFeedback();

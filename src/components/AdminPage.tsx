@@ -83,7 +83,7 @@ export default function AdminPage({ config, onLogout }: Props) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `lumina_results_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `lodha_results_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -352,81 +352,168 @@ export default function AdminPage({ config, onLogout }: Props) {
             </div>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="bg-surface p-10 rounded border border-border-dark space-y-10">
-              <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4"><Layout className="w-5 h-5" /> System Attributes</h3>
-              
-              <div className="space-y-8">
-                <div>
-                  <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Evaluation Latency (Seconds)</label>
-                  <input 
-                    type="number" 
-                    className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white"
-                    value={localConfig.timerPerQuestion}
-                    onChange={e => setLocalConfig({...localConfig, timerPerQuestion: parseInt(e.target.value)})}
-                  />
-                </div>
+          <div className="flex flex-col gap-8">
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="bg-surface p-10 rounded border border-border-dark space-y-10">
+                <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4"><Layout className="w-5 h-5" /> System Attributes</h3>
+                
+                <div className="space-y-8">
+                  <div>
+                    <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Evaluation Latency (Seconds)</label>
+                    <input 
+                      type="number" 
+                      className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
+                      value={localConfig.timerPerQuestion}
+                      onChange={e => setLocalConfig({...localConfig, timerPerQuestion: parseInt(e.target.value)})}
+                    />
+                  </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Evaluation Depth (Count)</label>
-                  <input 
-                    type="number" 
-                    className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white"
-                    value={localConfig.totalQuestions}
-                    onChange={e => setLocalConfig({...localConfig, totalQuestions: parseInt(e.target.value)})}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Aesthetic Signature (Color)</label>
-                  <div className="flex gap-6 items-center">
-                    <div className="relative">
-                      <input 
-                        type="color" 
-                        className="w-14 h-14 rounded-full border-0 cursor-pointer p-0 overflow-hidden bg-transparent"
-                        value={localConfig.themePrimary}
-                        onChange={e => setLocalConfig({...localConfig, themePrimary: e.target.value})}
-                      />
+                  <div>
+                    <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Aesthetic Signature (Color)</label>
+                    <div className="flex gap-6 items-center">
+                      <div className="relative">
+                        <input 
+                          type="color" 
+                          className="w-14 h-14 rounded-full border-0 cursor-pointer p-0 overflow-hidden bg-transparent"
+                          value={localConfig.themePrimary}
+                          onChange={e => setLocalConfig({...localConfig, themePrimary: e.target.value})}
+                        />
+                      </div>
+                      <span className="font-mono text-[14px] text-gold uppercase tracking-[1px]">{localConfig.themePrimary}</span>
                     </div>
-                    <span className="font-mono text-[14px] text-gold uppercase tracking-[1px]">{localConfig.themePrimary}</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Atmospheric Media URL</label>
+                    <input 
+                      className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
+                      value={localConfig.backgroundUrl}
+                      onChange={e => setLocalConfig({...localConfig, backgroundUrl: e.target.value})}
+                      placeholder="IMAGE SOURCE URL"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-surface p-10 rounded border border-border-dark h-fit flex flex-col justify-between h-full">
+                <div className="space-y-10">
+                  <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4"><LinkIcon className="w-5 h-5" /> Data Transmissions</h3>
+                  
+                  <div className="space-y-8">
+                    <div>
+                      <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">External Records Webhook</label>
+                      <textarea 
+                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-32 leading-relaxed"
+                        value={localConfig.googleSheetsWebhookUrl}
+                        onChange={e => setLocalConfig({...localConfig, googleSheetsWebhookUrl: e.target.value})}
+                        placeholder="HTTPS ENDPOINT URL"
+                      />
+                      <p className="mt-4 text-[10px] text-[#555555] uppercase tracking-[1px] leading-relaxed">
+                        Integration active: Participant data will be synchronized with the specified endpoint upon evaluation closure.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Atmospheric Media URL</label>
-                  <input 
-                    className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
-                    value={localConfig.backgroundUrl}
-                    onChange={e => setLocalConfig({...localConfig, backgroundUrl: e.target.value})}
-                    placeholder="IMAGE SOURCE URL"
-                  />
+                <div className="mt-12 pt-8 border-t border-border-dark">
+                  <button 
+                    onClick={saveConfig}
+                    className="w-full lodha-btn lodha-btn-primary flex items-center justify-center gap-3"
+                  >
+                    <Save className="w-5 h-5" /> Commit Configuration
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div className="bg-surface p-10 rounded border border-border-dark space-y-10 h-fit">
-              <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4"><LinkIcon className="w-5 h-5" /> Data Transmissions</h3>
-              
-              <div className="space-y-8">
-                <div>
-                  <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">External Records Webhook</label>
-                  <textarea 
-                    className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-32 leading-relaxed"
-                    value={localConfig.googleSheetsWebhookUrl}
-                    onChange={e => setLocalConfig({...localConfig, googleSheetsWebhookUrl: e.target.value})}
-                    placeholder="HTTPS ENDPOINT URL"
-                  />
-                  <p className="mt-4 text-[10px] text-[#555555] uppercase tracking-[1px] leading-relaxed">
-                    Integration active: Participant data will be synchronized with the specified endpoint upon evaluation closure.
-                  </p>
+            {/* Performance Configuration Section */}
+            <div className="bg-surface p-10 rounded border border-border-dark">
+              <div className="flex items-center justify-between border-b border-border-dark pb-6 mb-10">
+                <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3">
+                  <BarChart3 className="w-5 h-5" /> Performance Criteria & Feedback
+                </h3>
+              </div>
+
+              <div className="grid lg:grid-cols-3 gap-12">
+                {/* Thresholds */}
+                <div className="space-y-8">
+                  <h4 className="text-[11px] font-bold text-gold uppercase tracking-[2px] border-l-2 border-gold pl-3">Assessment Thresholds</h4>
+                  <div className="space-y-6">
+                    <div>
+                      <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Commendable (Excellent) %</label>
+                      <input 
+                        type="number" 
+                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
+                        value={localConfig.excellentThreshold}
+                        onChange={e => setLocalConfig({...localConfig, excellentThreshold: parseInt(e.target.value)})}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Criteria Met (Pass) %</label>
+                      <input 
+                        type="number" 
+                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
+                        value={localConfig.passThreshold}
+                        onChange={e => setLocalConfig({...localConfig, passThreshold: parseInt(e.target.value)})}
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <button 
-                  onClick={saveConfig}
-                  className="w-full lodha-btn lodha-btn-primary flex items-center justify-center gap-3"
-                >
-                  <Save className="w-5 h-5" /> Commit Configuration
-                </button>
+                {/* Feedback Configuration */}
+                <div className="lg:col-span-2 grid md:grid-cols-2 gap-8">
+                  <div className="space-y-8">
+                    <h4 className="text-[11px] font-bold text-gold uppercase tracking-[2px] border-l-2 border-gold pl-3">Excellent Feedback</h4>
+                    <div className="space-y-4">
+                      <input 
+                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
+                        value={localConfig.excellentTitle}
+                        onChange={e => setLocalConfig({...localConfig, excellentTitle: e.target.value})}
+                        placeholder="Excellent Title"
+                      />
+                      <textarea 
+                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-24"
+                        value={localConfig.excellentDesc}
+                        onChange={e => setLocalConfig({...localConfig, excellentDesc: e.target.value})}
+                        placeholder="Excellent Description"
+                      />
+                    </div>
+
+                    <h4 className="text-[11px] font-bold text-[#888888] uppercase tracking-[2px] border-l-2 border-[#888888] pl-3">Pass Feedback</h4>
+                    <div className="space-y-4">
+                      <input 
+                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
+                        value={localConfig.passTitle}
+                        onChange={e => setLocalConfig({...localConfig, passTitle: e.target.value})}
+                        placeholder="Pass Title"
+                      />
+                      <textarea 
+                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-24"
+                        value={localConfig.passDesc}
+                        onChange={e => setLocalConfig({...localConfig, passDesc: e.target.value})}
+                        placeholder="Pass Description"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <h4 className="text-[11px] font-bold text-red-900 uppercase tracking-[2px] border-l-2 border-red-900 pl-3">Criteria Not Met Feedback</h4>
+                    <div className="space-y-4">
+                      <input 
+                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
+                        value={localConfig.failTitle}
+                        onChange={e => setLocalConfig({...localConfig, failTitle: e.target.value})}
+                        placeholder="Fail Title"
+                      />
+                      <textarea 
+                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-24"
+                        value={localConfig.failDesc}
+                        onChange={e => setLocalConfig({...localConfig, failDesc: e.target.value})}
+                        placeholder="Fail Description"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

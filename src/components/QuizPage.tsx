@@ -34,8 +34,7 @@ export default function QuizPage({ user, config }: Props) {
     async function fetchQuestions() {
       const q = query(
         collection(db, "questions"), 
-        orderBy("order"), 
-        limit(config.totalQuestions)
+        orderBy("order")
       );
       try {
         const snapshot = await getDocs(q);
@@ -48,7 +47,7 @@ export default function QuizPage({ user, config }: Props) {
       }
     }
     fetchQuestions();
-  }, [config.totalQuestions]);
+  }, [config.timerPerQuestion]);
 
   const handleNext = useCallback(async () => {
     const currentQuestion = questions[currentIndex];

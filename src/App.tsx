@@ -21,10 +21,17 @@ export default function App() {
   });
   const [config, setConfig] = useState<GlobalConfig>({
     timerPerQuestion: 30,
-    totalQuestions: 20,
     themePrimary: "#c5a47e",
     backgroundUrl: "",
     googleSheetsWebhookUrl: "",
+    passThreshold: 50,
+    excellentThreshold: 80,
+    failTitle: "Criteria Not Met",
+    failDesc: "Additional evaluation or preparation is recommended.",
+    passTitle: "Evaluation Complete",
+    passDesc: "You have successfully cleared the assessment criteria.",
+    excellentTitle: "Commanding Performance",
+    excellentDesc: "You have demonstrated exceptional expertise and clarity.",
   });
 
   useEffect(() => {

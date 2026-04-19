@@ -19,10 +19,19 @@ export interface Submission {
 
 export interface GlobalConfig {
   timerPerQuestion: number;
-  totalQuestions: number;
   themePrimary: string;
   backgroundUrl: string;
   googleSheetsWebhookUrl: string;
+  // Feedback thresholds (Percentage)
+  passThreshold: number;
+  excellentThreshold: number;
+  // Feedback content
+  failTitle: string;
+  failDesc: string;
+  passTitle: string;
+  passDesc: string;
+  excellentTitle: string;
+  excellentDesc: string;
 }
 
 export interface UserDetails {
