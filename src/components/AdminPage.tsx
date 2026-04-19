@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
+import { motion, AnimatePresence } from "motion/react";
 import { UserDetails, GlobalConfig, Question, Submission } from "../types";
 import { 
   collection, 
@@ -27,7 +28,8 @@ import {
   FileText,
   Download,
   LogOut,
-  Loader2
+  Loader2,
+  Edit3
 } from "lucide-react";
 import UnifiedBackground from "./UnifiedBackground";
 
@@ -43,6 +45,7 @@ export default function AdminPage({ config, onLogout }: Props) {
   const [activeTab, setActiveTab] = useState<'questions' | 'submissions' | 'settings'>('questions');
   const [localConfig, setLocalConfig] = useState<GlobalConfig>(config);
   const [isSaving, setIsSaving] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, "questions"), orderBy("order"));
@@ -119,12 +122,12 @@ export default function AdminPage({ config, onLogout }: Props) {
   };
 
   const deleteQuestion = async (id: string) => {
-    if (confirm("Are you sure?")) {
-      try {
-        await deleteDoc(doc(db, "questions", id));
-      } catch (error) {
-        handleFirestoreError(error, 'delete', `questions/${id}`);
-      }
+    try {
+      await deleteDoc(doc(db, "questions", id));
+      setConfirmingDeleteId(null);
+    } catch (error: any) {
+      console.error("Delete question failed:", error);
+      alert(`Error deleting record: ${error.message}`);
     }
   };
 
@@ -149,6 +152,22 @@ export default function AdminPage({ config, onLogout }: Props) {
     });
   };
 
+  const deleteSubmission = async (id: string) => {
+    if (!id) {
+      console.error("No ID provided for deletion");
+      return;
+    }
+    
+    try {
+      const docRef = doc(db, "submissions", id);
+      await deleteDoc(docRef);
+      setConfirmingDeleteId(null);
+    } catch (error: any) {
+      console.error("Critical error during deletion:", error);
+      alert(`Failed to delete assessment: ${error.message}`);
+    }
+  };
+
   const renderQuestionsTab = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center bg-surface p-6 rounded border border-border-dark">
@@ -166,9 +185,40 @@ export default function AdminPage({ config, onLogout }: Props) {
             <div className="flex-1">
               <h4 className="font-serif text-xl text-white mb-4 leading-relaxed">{q.text}</h4>
             </div>
-            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={() => setEditingQuestion(q)} className="p-3 text-gold hover:bg-gold/5 rounded"><Save className="w-5 h-5" /></button>
-              <button onClick={() => deleteQuestion(q.id!)} className="p-3 text-red-900 hover:bg-red-950/20 rounded"><Trash2 className="w-5 h-5" /></button>
+            <div className="flex gap-2">
+              {confirmingDeleteId === q.id ? (
+                <div className="flex items-center gap-2 bg-black/40 p-1 rounded border border-red-900/30">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); deleteQuestion(q.id!); }}
+                    className="bg-red-600 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase transition-all hover:bg-red-700"
+                  >
+                    Confirm
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setConfirmingDeleteId(null); }}
+                    className="bg-gray-700 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase transition-all hover:bg-gray-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => setEditingQuestion(q)} 
+                    className="p-3 text-gold hover:bg-gold/5 rounded"
+                    title="Edit Question"
+                  >
+                    <Edit3 className="w-5 h-5" />
+                  </button>
+                  <button 
+                    onClick={() => setConfirmingDeleteId(q.id!)} 
+                    className="p-3 text-red-900 hover:bg-red-950/20 rounded"
+                    title="Delete Question"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -217,9 +267,33 @@ export default function AdminPage({ config, onLogout }: Props) {
                   </div>
                 </td>
                 <td className="p-4 text-right">
-                  <button onClick={() => deleteDoc(doc(db, "submissions", s.id!))} className="p-2 text-red-900 opacity-0 group-hover:opacity-100 hover:bg-red-950/20 rounded transition-all">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {confirmingDeleteId === s.id ? (
+                    <div className="flex items-center justify-end gap-2">
+                       <button 
+                        onClick={(e) => { e.stopPropagation(); deleteSubmission(s.id!); }}
+                        className="bg-red-600 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase"
+                      >
+                        Confirm
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setConfirmingDeleteId(null); }}
+                        className="bg-gray-700 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (s.id) setConfirmingDeleteId(s.id);
+                      }} 
+                      className="bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white px-4 py-2 rounded-md font-bold text-[10px] tracking-wider uppercase transition-all border border-red-600/30"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -403,6 +477,81 @@ export default function AdminPage({ config, onLogout }: Props) {
           </main>
         </div>
       </div>
+
+      {/* Question Editor Modal */}
+      {editingQuestion && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-surface border border-border-dark rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl"
+          >
+            <div className="p-8 border-b border-border-dark flex justify-between items-center bg-black/20">
+              <h3 className="text-sm font-bold text-gold uppercase tracking-[3px]">
+                {editingQuestion.id ? 'Refine Record' : 'Create New Record'}
+              </h3>
+              <button 
+                onClick={() => setEditingQuestion(null)}
+                className="text-[#888888] hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
+              <div>
+                <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Inquiry / Statement</label>
+                <textarea 
+                  className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-lg font-serif italic"
+                  value={editingQuestion.text}
+                  onChange={e => setEditingQuestion({...editingQuestion, text: e.target.value})}
+                  placeholder="Enter the assessment inquiry..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] block">Response Options</label>
+                {editingQuestion.options?.map((opt, idx) => (
+                  <div key={idx} className="flex gap-4 items-center group">
+                    <button 
+                      onClick={() => setEditingQuestion({...editingQuestion, correctAnswerIndex: idx})}
+                      className={`w-10 h-10 rounded-full border flex items-center justify-center shrink-0 transition-all ${editingQuestion.correctAnswerIndex === idx ? 'bg-gold border-gold text-black' : 'border-border-dark text-[#444444] hover:border-gold/50'}`}
+                    >
+                      {editingQuestion.correctAnswerIndex === idx ? <Check className="w-5 h-5" /> : (idx + 1)}
+                    </button>
+                    <input 
+                      className="flex-1 p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
+                      value={opt}
+                      onChange={e => {
+                        const newOps = [...(editingQuestion.options || [])];
+                        newOps[idx] = e.target.value;
+                        setEditingQuestion({...editingQuestion, options: newOps});
+                      }}
+                      placeholder={`Option ${idx + 1}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-8 bg-black/20 border-t border-border-dark flex justify-end gap-4">
+              <button 
+                onClick={() => setEditingQuestion(null)}
+                className="px-8 py-3 rounded font-bold text-[10px] uppercase tracking-[2px] text-[#888888] hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={saveQuestion}
+                className="lodha-btn lodha-btn-primary px-10 py-3"
+              >
+                Save Record
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </UnifiedBackground>
   );
 }

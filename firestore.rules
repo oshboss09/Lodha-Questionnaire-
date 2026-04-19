@@ -20,22 +20,28 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() > 0 && id.size() <= 128;
     }
 
     // --- Entity Validations ---
 
     function isValidConfig(data) {
-      return data.keys().hasAll(['timerPerQuestion', 'totalQuestions', 'themePrimary', 'backgroundUrl', 'googleSheetsWebhookUrl'])
+      let requiredFields = [
+        'timerPerQuestion', 'themePrimary', 'googleSheetsWebhookUrl',
+        'passThreshold', 'excellentThreshold', 'failTitle', 'failDesc',
+        'passTitle', 'passDesc', 'excellentTitle', 'excellentDesc'
+      ];
+      return data.keys().hasAll(requiredFields)
         && data.timerPerQuestion is number && data.timerPerQuestion >= 0
-        && data.totalQuestions is number && data.totalQuestions >= 0
         && data.themePrimary is string && data.themePrimary.size() <= 10
-        && data.backgroundUrl is string && data.backgroundUrl.size() <= 500
-        && data.googleSheetsWebhookUrl is string && data.googleSheetsWebhookUrl.size() <= 500;
+        && data.googleSheetsWebhookUrl is string && data.googleSheetsWebhookUrl.size() <= 500
+        && data.passThreshold is number
+        && data.excellentThreshold is number;
     }
 
     function isValidQuestion(data) {
       return data.keys().hasAll(['text', 'options', 'correctAnswerIndex', 'order'])
+        && data.keys().size() == 4
         && data.text is string && data.text.size() <= 1000
         && data.options is list && data.options.size() >= 2 && data.options.size() <= 10
         && data.correctAnswerIndex is number && data.correctAnswerIndex >= 0 && data.correctAnswerIndex < data.options.size()
@@ -44,18 +50,19 @@ service cloud.firestore {
 
     function isValidSubmission(data) {
       return data.keys().hasAll(['fullName', 'department', 'email', 'score', 'totalQuestions', 'responses', 'timestamp'])
+        && data.keys().size() == 7
         && data.fullName is string && data.fullName.size() <= 200
         && data.department is string && data.department.size() <= 200
         && data.email is string && data.email.size() <= 200
         && data.score is number && data.score >= 0
         && data.totalQuestions is number && data.totalQuestions >= 0
         && data.responses is map
-        && data.timestamp == request.time;
+        && (data.timestamp == request.time || data.timestamp is timestamp);
     }
 
     // --- Collections ---
 
-    // Config: Public read, Public admin write (for this applet's simplicity)
+    // Config: Public read, Public admin write
     match /config/{configId} {
       allow read: if isValidId(configId);
       allow create, update: if isValidId(configId) && isValidConfig(incoming());
@@ -70,10 +77,11 @@ service cloud.firestore {
       allow delete: if isValidId(questionId);
     }
 
-    // Submissions: Creation only by public, list for records
+    // Submissions: Creation only by public, list for records, delete for cleanup
     match /submissions/{submissionId} {
       allow create: if isValidId(submissionId) && isValidSubmission(incoming());
-      allow read, list: if true; // Admin panel needs this
+      allow read, list: if true; 
+      allow delete: if true;
     }
   }
 }

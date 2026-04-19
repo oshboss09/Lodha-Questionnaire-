@@ -22,7 +22,6 @@ export default function App() {
   const [config, setConfig] = useState<GlobalConfig>({
     timerPerQuestion: 30,
     themePrimary: "#c5a47e",
-    backgroundUrl: "",
     googleSheetsWebhookUrl: "",
     passThreshold: 50,
     excellentThreshold: 80,

@@ -22,9 +22,10 @@
         "email": { "type": "string" },
         "score": { "type": "number" },
         "totalQuestions": { "type": "number" },
+        "responses": { "type": "object" },
         "timestamp": { "type": "string", "format": "date-time" }
       },
-      "required": ["fullName", "department", "email", "score", "totalQuestions", "timestamp"]
+      "required": ["fullName", "department", "email", "score", "totalQuestions", "responses", "timestamp"]
     },
     "Config": {
       "title": "Config",
@@ -32,9 +33,16 @@
       "type": "object",
       "properties": {
         "timerPerQuestion": { "type": "number" },
-        "totalQuestions": { "type": "number" },
         "themePrimary": { "type": "string" },
-        "backgroundUrl": { "type": "string" }
+        "googleSheetsWebhookUrl": { "type": "string" },
+        "passThreshold": { "type": "number" },
+        "excellentThreshold": { "type": "number" },
+        "failTitle": { "type": "string" },
+        "failDesc": { "type": "string" },
+        "passTitle": { "type": "string" },
+        "passDesc": { "type": "string" },
+        "excellentTitle": { "type": "string" },
+        "excellentDesc": { "type": "string" }
       }
     }
   },
