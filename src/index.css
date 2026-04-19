@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gold: #c5a47e;
+  --color-surface: #151515;
+  --color-border-dark: #2a2a2a;
+  
+  --font-serif: "Georgia", serif;
+  --font-sans: "Helvetica Neue", Arial, sans-serif;
+  
+  --spacing-header: 80px;
+  --spacing-footer: 100px;
+  --width-sidebar: 280px;
+}
+
+@layer base {
+  body {
+    @apply bg-[#0a0a0a] text-[#e0e0e0] font-sans antialiased;
+  }
+  
+  h1, h2, h3, .serif {
+    @apply font-serif;
+  }
+}
+
+@layer components {
+  .lumina-card {
+    @apply bg-surface border border-border-dark rounded-lg;
+  }
+  
+  .lumina-btn {
+    @apply px-8 py-3.5 text-[12px] uppercase tracking-[2px] rounded font-bold transition-all duration-200;
+  }
+  
+  .lumina-btn-primary {
+    @apply bg-gold text-black hover:brightness-110 active:scale-[0.98];
+  }
+  
+  .lumina-btn-secondary {
+    @apply bg-transparent text-[#888888] border border-border-dark hover:border-gold/50;
+  }
+
+  .nav-dot {
+    @apply aspect-square border border-border-dark flex items-center justify-center text-[11px] cursor-pointer rounded-sm transition-all;
+  }
+
+  .nav-dot.active {
+    @apply border-gold text-gold;
+  }
+
+  .nav-dot.completed {
+    @apply bg-border-dark text-[#888888];
+  }
+}

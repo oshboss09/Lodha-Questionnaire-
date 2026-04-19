@@ -1,0 +1,6 @@
+{
+  "name": "QuizPro MCQ Platform",
+  "description": "A professional web-based MCQ test platform with real-time scoring, admin controls, and Google Sheets integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

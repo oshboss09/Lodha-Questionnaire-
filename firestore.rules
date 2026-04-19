@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 0.1 Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- Entity Validations ---
+
+    function isValidConfig(data) {
+      return data.keys().hasAll(['timerPerQuestion', 'totalQuestions', 'themePrimary', 'backgroundUrl', 'googleSheetsWebhookUrl'])
+        && data.timerPerQuestion is number && data.timerPerQuestion >= 0
+        && data.totalQuestions is number && data.totalQuestions >= 0
+        && data.themePrimary is string && data.themePrimary.size() <= 10
+        && data.backgroundUrl is string && data.backgroundUrl.size() <= 500
+        && data.googleSheetsWebhookUrl is string && data.googleSheetsWebhookUrl.size() <= 500;
+    }
+
+    function isValidQuestion(data) {
+      return data.keys().hasAll(['text', 'options', 'correctAnswerIndex', 'order'])
+        && data.text is string && data.text.size() <= 1000
+        && data.options is list && data.options.size() >= 2 && data.options.size() <= 10
+        && data.correctAnswerIndex is number && data.correctAnswerIndex >= 0 && data.correctAnswerIndex < data.options.size()
+        && data.order is number;
+    }
+
+    function isValidSubmission(data) {
+      return data.keys().hasAll(['fullName', 'department', 'email', 'score', 'totalQuestions', 'responses', 'timestamp'])
+        && data.fullName is string && data.fullName.size() <= 200
+        && data.department is string && data.department.size() <= 200
+        && data.email is string && data.email.size() <= 200
+        && data.score is number && data.score >= 0
+        && data.totalQuestions is number && data.totalQuestions >= 0
+        && data.responses is map
+        && data.timestamp == request.time;
+    }
+
+    // --- Collections ---
+
+    // Config: Public read, Public admin write (for this applet's simplicity)
+    match /config/{configId} {
+      allow read: if isValidId(configId);
+      allow create, update: if isValidId(configId) && isValidConfig(incoming());
+    }
+
+    // Questions: Public read, Public admin write
+    match /questions/{questionId} {
+      allow read, list: if true;
+      allow create: if isValidId(questionId) && isValidQuestion(incoming());
+      allow update: if isValidId(questionId) && isValidQuestion(incoming()) 
+        && (incoming().diff(existing()).affectedKeys().hasOnly(['text', 'options', 'correctAnswerIndex', 'order']));
+      allow delete: if isValidId(questionId);
+    }
+
+    // Submissions: Creation only by public, list for records
+    match /submissions/{submissionId} {
+      allow create: if isValidId(submissionId) && isValidSubmission(incoming());
+      allow read, list: if true; // Admin panel needs this
+    }
+  }
+}

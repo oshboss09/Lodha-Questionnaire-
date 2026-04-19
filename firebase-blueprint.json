@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "Question": {
+      "title": "Question",
+      "description": "An MCQ question",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "correctAnswerIndex": { "type": "number" },
+        "order": { "type": "number" }
+      },
+      "required": ["text", "options", "correctAnswerIndex"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "A completed test result",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "department": { "type": "string" },
+        "email": { "type": "string" },
+        "score": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "department", "email", "score", "totalQuestions", "timestamp"]
+    },
+    "Config": {
+      "title": "Config",
+      "description": "Global settings for the quiz",
+      "type": "object",
+      "properties": {
+        "timerPerQuestion": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "themePrimary": { "type": "string" },
+        "backgroundUrl": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Collection of all available questions"
+    },
+    "/submissions/{submissionId}": {
+      "schema": "Submission",
+      "description": "Participant test results"
+    },
+    "/config/global": {
+      "schema": "Config",
+      "description": "Global application configuration"
+    }
+  }
+}

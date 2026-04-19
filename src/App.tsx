@@ -1,0 +1,53 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import LandingPage from "./components/LandingPage";
+import QuizPage from "./components/QuizPage";
+import AdminPage from "./components/AdminPage";
+import ResultsPage from "./components/ResultsPage";
+import { UserDetails, GlobalConfig } from "./types";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db, handleFirestoreError } from "./lib/firebase";
+
+export default function App() {
+  const [user, setUser] = useState<UserDetails | null>(null);
+  const [config, setConfig] = useState<GlobalConfig>({
+    timerPerQuestion: 30,
+    totalQuestions: 20,
+    themePrimary: "#c5a47e",
+    backgroundUrl: "",
+    googleSheetsWebhookUrl: "",
+  });
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "config", "global"), (doc) => {
+      if (doc.exists()) {
+        setConfig(prev => ({ ...prev, ...doc.data() }));
+      }
+    }, (error) => {
+      handleFirestoreError(error, 'get', 'config/global');
+    });
+    return () => unsub();
+  }, []);
+
+  return (
+    <Router>
+      <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
+        <Routes>
+          <Route path="/" element={<LandingPage onStart={(details) => setUser(details)} config={config} />} />
+          <Route 
+            path="/quiz" 
+            element={user ? <QuizPage user={user} config={config} /> : <Navigate to="/" />} 
+          />
+          <Route path="/results" element={<ResultsPage user={user} config={config} />} />
+          <Route path="/admin" element={<AdminPage config={config} />} />
+        </Routes>
+      </div>
+    </Router>
+  );
+}
+
