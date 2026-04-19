@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { UserDetails, GlobalConfig, Question } from "../types";
+import { UserDetails, GlobalConfig, Question, Submission } from "../types";
 import { 
   collection, 
   onSnapshot, 
@@ -21,7 +21,9 @@ import {
   Check, 
   X,
   Layout,
-  Link as LinkIcon
+  Link as LinkIcon,
+  BarChart3,
+  FileText
 } from "lucide-react";
 
 interface Props {
@@ -30,8 +32,9 @@ interface Props {
 
 export default function AdminPage({ config }: Props) {
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [editingQuestion, setEditingQuestion] = useState<Partial<Question> | null>(null);
-  const [activeTab, setActiveTab] = useState<'questions' | 'settings'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'submissions' | 'settings'>('questions');
   const [localConfig, setLocalConfig] = useState<GlobalConfig>(config);
 
   useEffect(() => {
@@ -40,6 +43,16 @@ export default function AdminPage({ config }: Props) {
       setQuestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Question)));
     }, (error) => {
       handleFirestoreError(error, 'list', 'questions');
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const s = query(collection(db, "submissions"), orderBy("timestamp", "desc"));
+    const unsub = onSnapshot(s, (snapshot) => {
+      setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Submission)));
+    }, (error) => {
+      handleFirestoreError(error, 'list', 'submissions');
     });
     return () => unsub();
   }, []);
@@ -114,6 +127,12 @@ export default function AdminPage({ config }: Props) {
               <BookOpen className="w-4 h-4" /> Questions
             </button>
             <button 
+              onClick={() => setActiveTab('submissions')}
+              className={`flex items-center gap-2 px-6 py-2 rounded font-bold text-[11px] uppercase tracking-[1px] transition-all ${activeTab === 'submissions' ? 'bg-gold text-black shadow' : 'text-[#888888]'}`}
+            >
+              <FileText className="w-4 h-4" /> Results
+            </button>
+            <button 
               onClick={() => setActiveTab('settings')}
               className={`flex items-center gap-2 px-6 py-2 rounded font-bold text-[11px] uppercase tracking-[1px] transition-all ${activeTab === 'settings' ? 'bg-gold text-black shadow' : 'text-[#888888]'}`}
             >
@@ -123,6 +142,7 @@ export default function AdminPage({ config }: Props) {
         </header>
 
         {activeTab === 'questions' ? (
+          // ... existing questions tab logic ...
           <div className="space-y-6">
             <div className="flex justify-between items-center bg-surface p-6 rounded border border-border-dark">
               <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{questions.length} Active Records</h2>
@@ -217,6 +237,68 @@ export default function AdminPage({ config }: Props) {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        ) : activeTab === 'submissions' ? (
+          <div className="space-y-6">
+            <div className="bg-surface p-6 rounded border border-border-dark flex justify-between items-center">
+              <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{submissions.length} Total Assessments</h2>
+              <div className="text-[10px] text-[#888888] uppercase tracking-[1px]">Sorted by Most Recent</div>
+            </div>
+
+            <div className="bg-surface rounded border border-border-dark overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-black/40 border-b border-border-dark">
+                    <th className="p-4 text-[10px] font-bold text-gold uppercase tracking-[2px]">Participant</th>
+                    <th className="p-4 text-[10px] font-bold text-gold uppercase tracking-[2px]">Department</th>
+                    <th className="p-4 text-[10px] font-bold text-gold uppercase tracking-[2px]">Score</th>
+                    <th className="p-4 text-[10px] font-bold text-gold uppercase tracking-[2px]">Timestamp</th>
+                    <th className="p-4 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-dark/50">
+                  {submissions.map((s) => (
+                    <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
+                      <td className="p-4">
+                        <div className="text-white font-serif italic">{s.fullName}</div>
+                        <div className="text-[10px] text-[#888888] uppercase tracking-[1px]">{s.email}</div>
+                      </td>
+                      <td className="p-4 text-[11px] text-[#e0e0e0] uppercase tracking-[1px] font-bold">{s.department}</td>
+                      <td className="p-4 text-lg font-serif">
+                        <span className={`
+                          ${(s.score / s.totalQuestions) >= 0.7 ? 'text-green-500' : 'text-amber-500'}
+                        `}>
+                          {s.score}
+                        </span>
+                        <span className="text-[#555555]"> / {s.totalQuestions}</span>
+                      </td>
+                      <td className="p-4 text-[11px] text-[#888888] font-mono">
+                        {s.timestamp?.toDate ? s.timestamp.toDate().toLocaleString() : new Date(s.timestamp).toLocaleString()}
+                      </td>
+                      <td className="p-4 text-right">
+                        <button 
+                          onClick={async () => {
+                            if (confirm("Permanently delete this record?")) {
+                              await deleteDoc(doc(db, "submissions", s.id!));
+                            }
+                          }}
+                          className="p-2 text-red-900 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-950/20 rounded"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {submissions.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-12 text-center">
+                        <div className="text-[#555555] font-serif italic text-lg">No assessment records found.</div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         ) : (
