@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { collection, query, orderBy, limit, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { db, handleFirestoreError } from "../lib/firebase";
 import { Clock, ChevronRight, AlertCircle, Loader2 } from "lucide-react";
+import UnifiedBackground from "./UnifiedBackground";
 
 interface Props {
   user: UserDetails;
@@ -151,117 +152,119 @@ export default function QuizPage({ user, config }: Props) {
   const progress = ((currentIndex + 1) / questions.length) * 100;
 
   return (
-    <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#0a0a0a]">
-      {/* Header */}
-      <header className="h-[80px] bg-surface border-b border-border-dark flex items-center justify-between px-10 shrink-0">
-        <div className="font-serif text-2xl tracking-[2px] text-gold uppercase">Lodha</div>
-        <div className="flex items-center gap-3 bg-gold/10 border border-gold px-4 py-2 rounded">
-          <span className="text-[12px] uppercase tracking-[1px] text-gold font-medium">Time Remaining</span>
-          <span className="font-mono text-xl font-bold text-gold">
-            {Math.floor(Math.max(0, timeLeft) / 60).toString().padStart(2, '0')}:
-            {(Math.max(0, timeLeft) % 60).toString().padStart(2, '0')}
-          </span>
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <main className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-[280px] bg-surface border-r border-border-dark p-8 flex flex-col gap-10 shrink-0 overflow-y-auto">
-          <div className="flex flex-col gap-2">
-            <div className="text-[12px] text-[#888888] uppercase tracking-[1px]">Participant</div>
-            <div className="font-serif text-lg italic text-white">{user.fullName}</div>
-            <div className="text-[12px] text-[#888888] uppercase tracking-[1px] opacity-70">{user.department}</div>
+    <UnifiedBackground>
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Header */}
+        <header className="h-[80px] bg-surface/80 backdrop-blur-md border-b border-border-dark flex items-center justify-between px-10 shrink-0">
+          <div className="font-serif text-2xl tracking-[2px] text-gold uppercase">Lodha</div>
+          <div className="flex items-center gap-3 bg-gold/10 border border-gold/40 px-4 py-2 rounded">
+            <span className="text-[12px] uppercase tracking-[1px] text-gold font-medium">Time Remaining</span>
+            <span className="font-mono text-xl font-bold text-gold">
+              {Math.floor(Math.max(0, timeLeft) / 60).toString().padStart(2, '0')}:
+              {(Math.max(0, timeLeft) % 60).toString().padStart(2, '0')}
+            </span>
           </div>
+        </header>
 
-          <div className="flex flex-col gap-3">
-            <div className="text-[12px] text-[#888888] uppercase tracking-[1px]">Question Navigator</div>
-            <div className="grid grid-cols-4 gap-2.5">
-              {Array.from({ length: questions.length }).map((_, idx) => (
-                <div 
-                  key={idx}
-                  className={`nav-dot ${idx === currentIndex ? 'active' : ''} ${idx < currentIndex ? 'completed' : ''}`}
+        {/* Main Container */}
+        <main className="flex-1 flex overflow-hidden">
+          {/* Sidebar */}
+          <aside className="w-[280px] bg-surface/40 backdrop-blur-sm border-r border-border-dark p-8 flex flex-col gap-10 shrink-0 overflow-y-auto">
+            <div className="flex flex-col gap-2">
+              <div className="text-[12px] text-[#888888] uppercase tracking-[1px]">Participant</div>
+              <div className="font-serif text-lg italic text-white">{user.fullName}</div>
+              <div className="text-[12px] text-[#888888] uppercase tracking-[1px] opacity-70">{user.department}</div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div className="text-[12px] text-[#888888] uppercase tracking-[1px]">Question Navigator</div>
+              <div className="grid grid-cols-4 gap-2.5">
+                {Array.from({ length: questions.length }).map((_, idx) => (
+                  <div 
+                    key={idx}
+                    className={`nav-dot ${idx === currentIndex ? 'active' : ''} ${idx < currentIndex ? 'completed' : ''}`}
+                  >
+                    {(idx + 1).toString().padStart(2, '0')}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
+
+          {/* Content Area */}
+          <section className="flex-1 p-16 md:p-20 overflow-y-auto relative">
+            <div className="max-w-4xl">
+              <div className="text-[12px] uppercase tracking-[2px] text-gold mb-6">
+                Module Assessment: {user.department}
+              </div>
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentIndex}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  {(idx + 1).toString().padStart(2, '0')}
-                </div>
-              ))}
+                  <h2 className="font-serif text-3xl md:text-4xl text-white mb-12 leading-[1.4] text-shadow">
+                    {currentQuestion.text}
+                  </h2>
+
+                  <div className="flex flex-col gap-4">
+                    {currentQuestion.options.map((option, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedOption(idx)}
+                        className={`
+                          w-full text-left p-5 px-6 rounded-lg border flex items-center gap-4 transition-all duration-200
+                          ${selectedOption === idx 
+                            ? 'border-gold bg-gold/10 backdrop-blur-md' 
+                            : 'border-border-dark bg-surface/20 hover:border-gold/50 hover:bg-white/[0.05]'}
+                        `}
+                      >
+                        <div className={`
+                          w-5 h-5 rounded-full border flex items-center justify-center shrink-0
+                          ${selectedOption === idx ? 'border-gold bg-gold' : 'border-border-dark'}
+                        `}>
+                          {selectedOption === idx && <div className="w-2 h-2 bg-black rounded-full" />}
+                        </div>
+                        <span className="text-[16px] text-[#e0e0e0] font-normal leading-relaxed">{option}</span>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </section>
+        </main>
+
+        {/* Footer */}
+        <footer className="h-[100px] bg-surface/80 backdrop-blur-md border-t border-border-dark flex items-center justify-between px-10 shrink-0">
+          <div className="flex flex-col gap-2 w-[400px]">
+            <div className="text-[12px] text-[#888888] uppercase tracking-[1px]">
+              Progress: {currentIndex + 1} of {questions.length} answered
+            </div>
+            <div className="h-[2px] bg-border-dark w-full rounded-full overflow-hidden">
+              <motion.div 
+                className="h-full bg-gold"
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.5 }}
+              />
             </div>
           </div>
-        </aside>
 
-        {/* Content Area */}
-        <section className="flex-1 bg-[#0a0a0a] p-16 md:p-20 overflow-y-auto relative">
-          <div className="max-w-4xl">
-            <div className="text-[12px] uppercase tracking-[2px] text-gold mb-6">
-              Module Assessment: {user.department}
-            </div>
-
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentIndex}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-              >
-                <h2 className="font-serif text-3xl md:text-4xl text-white mb-12 leading-[1.4]">
-                  {currentQuestion.text}
-                </h2>
-
-                <div className="flex flex-col gap-4">
-                  {currentQuestion.options.map((option, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedOption(idx)}
-                      className={`
-                        w-full text-left p-5 px-6 rounded-lg border flex items-center gap-4 transition-all duration-200
-                        ${selectedOption === idx 
-                          ? 'border-gold bg-gold/5' 
-                          : 'border-border-dark hover:border-gold/50 hover:bg-white/[0.02]'}
-                      `}
-                    >
-                      <div className={`
-                        w-5 h-5 rounded-full border flex items-center justify-center shrink-0
-                        ${selectedOption === idx ? 'border-gold bg-gold' : 'border-border-dark'}
-                      `}>
-                        {selectedOption === idx && <div className="w-2 h-2 bg-black rounded-full" />}
-                      </div>
-                      <span className="text-[16px] text-[#e0e0e0] font-normal leading-relaxed">{option}</span>
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            </AnimatePresence>
+          <div className="flex gap-4">
+            <button
+              disabled={selectedOption === null || isSubmitting}
+              onClick={handleNext}
+              className={`lodha-btn ${selectedOption === null || isSubmitting ? 'opacity-30 cursor-not-allowed lodha-btn-secondary' : 'lodha-btn-primary'}`}
+            >
+              {isSubmitting ? "Processing..." : (currentIndex === questions.length - 1 ? "Finish Assessment" : "Next Question")}
+            </button>
           </div>
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="h-[100px] bg-surface border-t border-border-dark flex items-center justify-between px-10 shrink-0">
-        <div className="flex flex-col gap-2 w-[400px]">
-          <div className="text-[12px] text-[#888888] uppercase tracking-[1px]">
-            Progress: {currentIndex + 1} of {questions.length} answered
-          </div>
-          <div className="h-[2px] bg-border-dark w-full rounded-full overflow-hidden">
-            <motion.div 
-              className="h-full bg-gold"
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.5 }}
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-4">
-          <button
-            disabled={selectedOption === null || isSubmitting}
-            onClick={handleNext}
-            className={`lodha-btn ${selectedOption === null || isSubmitting ? 'opacity-30 cursor-not-allowed lodha-btn-secondary' : 'lodha-btn-primary'}`}
-          >
-            {isSubmitting ? "Processing..." : (currentIndex === questions.length - 1 ? "Finish Assessment" : "Next Question")}
-          </button>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </UnifiedBackground>
   );
 }

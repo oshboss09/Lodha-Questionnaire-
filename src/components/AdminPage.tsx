@@ -26,8 +26,10 @@ import {
   BarChart3,
   FileText,
   Download,
-  LogOut
+  LogOut,
+  Loader2
 } from "lucide-react";
+import UnifiedBackground from "./UnifiedBackground";
 
 interface Props {
   config: GlobalConfig;
@@ -40,6 +42,7 @@ export default function AdminPage({ config, onLogout }: Props) {
   const [editingQuestion, setEditingQuestion] = useState<Partial<Question> | null>(null);
   const [activeTab, setActiveTab] = useState<'questions' | 'submissions' | 'settings'>('questions');
   const [localConfig, setLocalConfig] = useState<GlobalConfig>(config);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "questions"), orderBy("order"));
@@ -126,11 +129,14 @@ export default function AdminPage({ config, onLogout }: Props) {
   };
 
   const saveConfig = async () => {
+    setIsSaving(true);
     try {
       await setDoc(doc(db, "config", "global"), localConfig);
-      alert("Configuration saved!");
+      alert("Lodha System Attributes Globally Committed.");
     } catch (error) {
       handleFirestoreError(error, 'write', 'config/global');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -143,382 +149,236 @@ export default function AdminPage({ config, onLogout }: Props) {
     });
   };
 
+  const renderQuestionsTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center bg-surface p-6 rounded border border-border-dark">
+        <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{questions.length} Active Records</h2>
+        <button onClick={addQuestion} className="lodha-btn lodha-btn-primary flex items-center gap-2">
+          <Plus className="w-5 h-5" /> New Record
+        </button>
+      </div>
+      <div className="grid gap-4">
+        {questions.map((q, idx) => (
+          <div key={q.id} className="bg-surface p-6 rounded border border-border-dark flex gap-6 items-start group hover:border-gold/30 transition-all">
+            <div className="w-12 h-12 rounded bg-black flex items-center justify-center font-serif text-lg text-gold shrink-0 border border-border-dark">
+              {(idx + 1).toString().padStart(2, '0')}
+            </div>
+            <div className="flex-1">
+              <h4 className="font-serif text-xl text-white mb-4 leading-relaxed">{q.text}</h4>
+            </div>
+            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => setEditingQuestion(q)} className="p-3 text-gold hover:bg-gold/5 rounded"><Save className="w-5 h-5" /></button>
+              <button onClick={() => deleteQuestion(q.id!)} className="p-3 text-red-900 hover:bg-red-950/20 rounded"><Trash2 className="w-5 h-5" /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderSubmissionsTab = () => (
+    <div className="space-y-6">
+      <div className="bg-surface p-6 rounded border border-border-dark flex justify-between items-center">
+        <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{submissions.length} Total Assessments</h2>
+        <button onClick={downloadCSV} className="lodha-btn lodha-btn-primary flex items-center gap-2">
+          <Download className="w-4 h-4" /> Export CSV
+        </button>
+      </div>
+      <div className="bg-surface rounded border border-border-dark overflow-hidden">
+        <table className="w-full text-left">
+          <tbody className="divide-y divide-border-dark/50">
+            {submissions.map((s) => (
+              <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
+                <td className="p-4">
+                  <div className="text-white font-serif italic text-sm">{s.fullName}</div>
+                </td>
+                <td className="p-4 text-right">
+                  <button onClick={() => deleteDoc(doc(db, "submissions", s.id!))} className="p-2 text-red-900 opacity-0 group-hover:opacity-100 hover:bg-red-950/20 rounded">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderSettingsTab = () => (
+    <div className="space-y-8">
+      <div className="grid md:grid-cols-2 gap-8">
+        <div className="bg-surface p-10 rounded border border-border-dark space-y-10">
+          <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4"><Layout className="w-5 h-5" /> System Attributes</h3>
+          
+          <div className="space-y-8">
+            <div>
+              <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Evaluation Latency (Seconds)</label>
+              <input 
+                type="number" 
+                className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
+                value={localConfig.timerPerQuestion}
+                onChange={e => setLocalConfig(prev => ({...prev, timerPerQuestion: parseInt(e.target.value)}))}
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Aesthetic Signature (Color)</label>
+              <div className="flex gap-6 items-center">
+                <input 
+                  type="color" 
+                  className="w-14 h-14 rounded-full border-0 cursor-pointer p-0 overflow-hidden bg-transparent"
+                  value={localConfig.themePrimary}
+                  onChange={e => setLocalConfig(prev => ({...prev, themePrimary: e.target.value}))}
+                />
+                <span className="font-mono text-[14px] text-gold uppercase tracking-[1px]">{localConfig.themePrimary}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-surface p-10 rounded border border-border-dark h-full">
+          <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4"><LinkIcon className="w-5 h-5" /> Data Transmissions</h3>
+          <div className="space-y-8 mt-10">
+            <div>
+              <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Webhook URL</label>
+              <textarea 
+                className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-32 leading-relaxed"
+                value={localConfig.googleSheetsWebhookUrl}
+                onChange={e => setLocalConfig(prev => ({...prev, googleSheetsWebhookUrl: e.target.value}))}
+                placeholder="HTTPS ENDPOINT URL"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-surface p-10 rounded border border-border-dark">
+        <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-6 mb-10">
+          <BarChart3 className="w-5 h-5" /> Performance Criteria & Feedback
+        </h3>
+        <div className="grid lg:grid-cols-3 gap-12">
+          <div className="space-y-8">
+            <h4 className="text-[11px] font-bold text-gold uppercase tracking-[2px] border-l-2 border-gold pl-3">Assessment Thresholds</h4>
+            <div className="space-y-6">
+              <div>
+                <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Commendable (Excellent) %</label>
+                <input 
+                  type="number" 
+                  className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
+                  value={localConfig.excellentThreshold}
+                  onChange={e => setLocalConfig(prev => ({...prev, excellentThreshold: parseInt(e.target.value)}))}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Criteria Met (Pass) %</label>
+                <input 
+                  type="number" 
+                  className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
+                  value={localConfig.passThreshold}
+                  onChange={e => setLocalConfig(prev => ({...prev, passThreshold: parseInt(e.target.value)}))}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 grid md:grid-cols-2 gap-8">
+            <div className="space-y-8">
+              <h4 className="text-[11px] font-bold text-gold uppercase tracking-[2px] border-l-2 border-gold pl-3">Excellent Feedback</h4>
+              <input 
+                className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
+                value={localConfig.excellentTitle}
+                onChange={e => setLocalConfig(prev => ({...prev, excellentTitle: e.target.value}))}
+                placeholder="Title"
+              />
+              <textarea 
+                className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-24"
+                value={localConfig.excellentDesc}
+                onChange={e => setLocalConfig(prev => ({...prev, excellentDesc: e.target.value}))}
+                placeholder="Description"
+              />
+            </div>
+            <div className="space-y-8">
+              <h4 className="text-[11px] font-bold text-gold uppercase tracking-[2px] border-l-2 border-gold pl-3">Pass Feedback</h4>
+              <input 
+                className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
+                value={localConfig.passTitle}
+                onChange={e => setLocalConfig(prev => ({...prev, passTitle: e.target.value}))}
+                placeholder="Title"
+              />
+              <textarea 
+                className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-24"
+                value={localConfig.passDesc}
+                onChange={e => setLocalConfig(prev => ({...prev, passDesc: e.target.value}))}
+                placeholder="Description"
+              />
+            </div>
+            <div className="space-y-8 md:col-span-2">
+              <h4 className="text-[11px] font-bold text-red-900 uppercase tracking-[2px] border-l-2 border-red-900 pl-3">Criteria Not Met Feedback</h4>
+              <input 
+                className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
+                value={localConfig.failTitle}
+                onChange={e => setLocalConfig(prev => ({...prev, failTitle: e.target.value}))}
+                placeholder="Title"
+              />
+              <textarea 
+                className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-24"
+                value={localConfig.failDesc}
+                onChange={e => setLocalConfig(prev => ({...prev, failDesc: e.target.value}))}
+                placeholder="Description"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-surface p-6 rounded border border-border-dark flex items-center justify-center gap-6">
+        <button 
+          onClick={saveConfig}
+          disabled={isSaving}
+          className="lodha-btn lodha-btn-primary flex items-center justify-center gap-3 px-10 py-4 min-w-[240px]"
+        >
+          {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+          {isSaving ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="flex-1 p-4 md:p-8 overflow-y-auto bg-[#0a0a0a]">
-      <div className="max-w-5xl mx-auto">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-12">
-          <div>
-            <h1 className="text-3xl font-serif text-white tracking-[2px] uppercase">Lodha Control</h1>
-            <div className="flex items-center gap-4 mt-2">
-              <p className="text-[#888888] text-[11px] uppercase tracking-[1px]">Assessment Infrastructure</p>
-              <div className="h-3 w-px bg-border-dark"></div>
+    <UnifiedBackground>
+      <div className="flex-1 p-4 md:p-8 overflow-y-auto min-h-screen">
+        <div className="max-w-5xl mx-auto space-y-12">
+          <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-surface/40 backdrop-blur-md p-6 rounded border border-border-dark">
+            <div>
+              <h1 className="text-3xl font-serif text-white tracking-[2px] uppercase">Lodha Control</h1>
               <button 
                 onClick={onLogout}
-                className="text-[10px] text-red-900 uppercase tracking-[1px] font-bold flex items-center gap-2 hover:text-red-700 transition-colors"
+                className="text-[10px] text-red-900 uppercase tracking-[1px] font-bold flex items-center gap-2 mt-2 hover:opacity-80"
               >
                 <LogOut className="w-3 h-3" /> Logout
               </button>
             </div>
-          </div>
-          <div className="flex bg-surface rounded p-1 border border-border-dark">
-            <button 
-              onClick={() => setActiveTab('questions')}
-              className={`flex items-center gap-2 px-6 py-2 rounded font-bold text-[11px] uppercase tracking-[1px] transition-all ${activeTab === 'questions' ? 'bg-gold text-black shadow' : 'text-[#888888]'}`}
-            >
-              <BookOpen className="w-4 h-4" /> Questions
-            </button>
-            <button 
-              onClick={() => setActiveTab('submissions')}
-              className={`flex items-center gap-2 px-6 py-2 rounded font-bold text-[11px] uppercase tracking-[1px] transition-all ${activeTab === 'submissions' ? 'bg-gold text-black shadow' : 'text-[#888888]'}`}
-            >
-              <FileText className="w-4 h-4" /> Results
-            </button>
-            <button 
-              onClick={() => setActiveTab('settings')}
-              className={`flex items-center gap-2 px-6 py-2 rounded font-bold text-[11px] uppercase tracking-[1px] transition-all ${activeTab === 'settings' ? 'bg-gold text-black shadow' : 'text-[#888888]'}`}
-            >
-              <SettingsIcon className="w-4 h-4" /> Settings
-            </button>
-          </div>
-        </header>
-
-        {activeTab === 'questions' ? (
-          // ... existing questions tab logic ...
-          <div className="space-y-6">
-            <div className="flex justify-between items-center bg-surface p-6 rounded border border-border-dark">
-              <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{questions.length} Active Records</h2>
-              <button 
-                onClick={addQuestion}
-                className="lodha-btn lodha-btn-primary flex items-center gap-2"
-              >
-                <Plus className="w-5 h-5" /> New Record
-              </button>
-            </div>
-
-            {editingQuestion && (
-              <div className="bg-surface p-8 rounded border border-gold/30 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
-                <div className="flex justify-between mb-8 border-b border-border-dark pb-4">
-                  <h3 className="font-serif italic text-xl text-white">{editingQuestion.id ? 'Modify Record' : 'Create Record'}</h3>
-                  <button onClick={() => setEditingQuestion(null)} className="text-[#888888] hover:text-white">
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                
-                <div className="space-y-8">
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-bold text-gold tracking-[2px] mb-1 block">Question Descriptor</label>
-                    <textarea 
-                      className="w-full p-6 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#e0e0e0] font-serif italic text-lg"
-                      value={editingQuestion.text}
-                      onChange={e => setEditingQuestion({...editingQuestion, text: e.target.value})}
-                      placeholder="Input the inquiry..."
-                    />
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {editingQuestion.options?.map((opt, idx) => (
-                      <div key={idx} className="flex gap-4 items-center">
-                        <button 
-                          onClick={() => setEditingQuestion({...editingQuestion, correctAnswerIndex: idx})}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all shrink-0 ${editingQuestion.correctAnswerIndex === idx ? 'bg-gold border-gold text-black' : 'border-border-dark text-[#888888]'}`}
-                        >
-                          {editingQuestion.correctAnswerIndex === idx ? <Check className="w-5 h-5" /> : idx + 1}
-                        </button>
-                        <input 
-                          className="flex-1 p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#e0e0e0]"
-                          value={opt}
-                          onChange={e => {
-                            const newOpts = [...editingQuestion.options!];
-                            newOpts[idx] = e.target.value;
-                            setEditingQuestion({...editingQuestion, options: newOpts});
-                          }}
-                          placeholder={`Option ${idx + 1}`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex justify-end gap-4 mt-8 pt-8 border-t border-border-dark">
-                    <button onClick={() => setEditingQuestion(null)} className="px-6 py-2 text-[11px] font-bold text-[#888888] uppercase tracking-[1px]">Discard</button>
-                    <button onClick={saveQuestion} className="lodha-btn lodha-btn-primary">Apply Changes</button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="grid gap-4">
-              {questions.map((q, idx) => (
-                <div key={q.id} className="bg-surface p-6 rounded border border-border-dark flex gap-6 items-start group hover:border-gold/30 transition-all">
-                  <div className="w-12 h-12 rounded bg-black flex items-center justify-center font-serif text-lg text-gold shrink-0 border border-border-dark">
-                    {(idx + 1).toString().padStart(2, '0')}
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-serif text-xl text-white mb-4 leading-relaxed">{q.text}</h4>
-                    <div className="flex flex-wrap gap-2">
-                       {q.options.map((opt, optIdx) => (
-                         <span key={optIdx} className={`px-4 py-1 rounded text-[10px] font-bold tracking-[1px] uppercase ${optIdx === q.correctAnswerIndex ? 'bg-gold/10 text-gold border border-gold/20' : 'bg-black/40 text-[#555555] border border-border-dark'}`}>
-                           {opt}
-                         </span>
-                       ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={() => setEditingQuestion(q)}
-                      className="p-3 text-gold hover:bg-gold/5 rounded"
-                    >
-                      <Save className="w-5 h-5" />
-                    </button>
-                    <button 
-                      onClick={() => deleteQuestion(q.id!)}
-                      className="p-3 text-red-900 hover:bg-red-950/20 rounded"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
+            <div className="flex bg-surface rounded p-1 border border-border-dark">
+              {(['questions', 'submissions', 'settings'] as const).map(tab => (
+                 <button 
+                   key={tab}
+                   onClick={() => setActiveTab(tab)}
+                   className={`px-6 py-2 rounded font-bold text-[10px] uppercase tracking-[1px] transition-all ${activeTab === tab ? 'bg-gold text-black shadow' : 'text-[#888888] hover:bg-white/5'}`}
+                 >
+                   {tab}
+                 </button>
               ))}
             </div>
-          </div>
-        ) : activeTab === 'submissions' ? (
-          <div className="space-y-6">
-            <div className="bg-surface p-6 rounded border border-border-dark flex justify-between items-center">
-              <div className="flex flex-col gap-1">
-                <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{submissions.length} Total Assessments</h2>
-                <div className="text-[10px] text-[#888888] uppercase tracking-[1px]">Real-time evaluation records</div>
-              </div>
-              <button 
-                onClick={downloadCSV}
-                disabled={submissions.length === 0}
-                className={`lodha-btn lodha-btn-primary flex items-center gap-2 ${submissions.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
-              >
-                <Download className="w-4 h-4" /> Export CSV
-              </button>
-            </div>
+          </header>
 
-            <div className="bg-surface rounded border border-border-dark overflow-hidden">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-black/40 border-b border-border-dark">
-                    <th className="p-4 text-[10px] font-bold text-gold uppercase tracking-[2px]">Participant</th>
-                    <th className="p-4 text-[10px] font-bold text-gold uppercase tracking-[2px]">Department</th>
-                    <th className="p-4 text-[10px] font-bold text-gold uppercase tracking-[2px]">Score</th>
-                    <th className="p-4 text-[10px] font-bold text-gold uppercase tracking-[2px]">Timestamp</th>
-                    <th className="p-4 text-right"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-dark/50">
-                  {submissions.map((s) => (
-                    <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
-                      <td className="p-4">
-                        <div className="text-white font-serif italic">{s.fullName}</div>
-                        <div className="text-[10px] text-[#888888] uppercase tracking-[1px]">{s.email}</div>
-                      </td>
-                      <td className="p-4 text-[11px] text-[#e0e0e0] uppercase tracking-[1px] font-bold">{s.department}</td>
-                      <td className="p-4 text-lg font-serif">
-                        <span className={`
-                          ${(s.score / s.totalQuestions) >= 0.7 ? 'text-green-500' : 'text-amber-500'}
-                        `}>
-                          {s.score}
-                        </span>
-                        <span className="text-[#555555]"> / {s.totalQuestions}</span>
-                      </td>
-                      <td className="p-4 text-[11px] text-[#888888] font-mono">
-                        {format(s.timestamp?.toDate ? s.timestamp.toDate() : new Date(s.timestamp), "dd-MMM-yyyy")}
-                      </td>
-                      <td className="p-4 text-right">
-                        <button 
-                          onClick={async () => {
-                            if (confirm("Permanently delete this record?")) {
-                              await deleteDoc(doc(db, "submissions", s.id!));
-                            }
-                          }}
-                          className="p-2 text-red-900 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-950/20 rounded"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {submissions.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="p-12 text-center">
-                        <div className="text-[#555555] font-serif italic text-lg">No assessment records found.</div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-8">
-            <div className="grid md:grid-cols-2 gap-8">
-              <div className="bg-surface p-10 rounded border border-border-dark space-y-10">
-                <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4"><Layout className="w-5 h-5" /> System Attributes</h3>
-                
-                <div className="space-y-8">
-                  <div>
-                    <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Evaluation Latency (Seconds)</label>
-                    <input 
-                      type="number" 
-                      className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
-                      value={localConfig.timerPerQuestion}
-                      onChange={e => setLocalConfig({...localConfig, timerPerQuestion: parseInt(e.target.value)})}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Aesthetic Signature (Color)</label>
-                    <div className="flex gap-6 items-center">
-                      <div className="relative">
-                        <input 
-                          type="color" 
-                          className="w-14 h-14 rounded-full border-0 cursor-pointer p-0 overflow-hidden bg-transparent"
-                          value={localConfig.themePrimary}
-                          onChange={e => setLocalConfig({...localConfig, themePrimary: e.target.value})}
-                        />
-                      </div>
-                      <span className="font-mono text-[14px] text-gold uppercase tracking-[1px]">{localConfig.themePrimary}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Atmospheric Media URL</label>
-                    <input 
-                      className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
-                      value={localConfig.backgroundUrl}
-                      onChange={e => setLocalConfig({...localConfig, backgroundUrl: e.target.value})}
-                      placeholder="IMAGE SOURCE URL"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-surface p-10 rounded border border-border-dark h-fit flex flex-col justify-between h-full">
-                <div className="space-y-10">
-                  <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4"><LinkIcon className="w-5 h-5" /> Data Transmissions</h3>
-                  
-                  <div className="space-y-8">
-                    <div>
-                      <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">External Records Webhook</label>
-                      <textarea 
-                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-32 leading-relaxed"
-                        value={localConfig.googleSheetsWebhookUrl}
-                        onChange={e => setLocalConfig({...localConfig, googleSheetsWebhookUrl: e.target.value})}
-                        placeholder="HTTPS ENDPOINT URL"
-                      />
-                      <p className="mt-4 text-[10px] text-[#555555] uppercase tracking-[1px] leading-relaxed">
-                        Integration active: Participant data will be synchronized with the specified endpoint upon evaluation closure.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-12 pt-8 border-t border-border-dark">
-                  <button 
-                    onClick={saveConfig}
-                    className="w-full lodha-btn lodha-btn-primary flex items-center justify-center gap-3"
-                  >
-                    <Save className="w-5 h-5" /> Commit Configuration
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Performance Configuration Section */}
-            <div className="bg-surface p-10 rounded border border-border-dark">
-              <div className="flex items-center justify-between border-b border-border-dark pb-6 mb-10">
-                <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3">
-                  <BarChart3 className="w-5 h-5" /> Performance Criteria & Feedback
-                </h3>
-              </div>
-
-              <div className="grid lg:grid-cols-3 gap-12">
-                {/* Thresholds */}
-                <div className="space-y-8">
-                  <h4 className="text-[11px] font-bold text-gold uppercase tracking-[2px] border-l-2 border-gold pl-3">Assessment Thresholds</h4>
-                  <div className="space-y-6">
-                    <div>
-                      <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Commendable (Excellent) %</label>
-                      <input 
-                        type="number" 
-                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
-                        value={localConfig.excellentThreshold}
-                        onChange={e => setLocalConfig({...localConfig, excellentThreshold: parseInt(e.target.value)})}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Criteria Met (Pass) %</label>
-                      <input 
-                        type="number" 
-                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
-                        value={localConfig.passThreshold}
-                        onChange={e => setLocalConfig({...localConfig, passThreshold: parseInt(e.target.value)})}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Feedback Configuration */}
-                <div className="lg:col-span-2 grid md:grid-cols-2 gap-8">
-                  <div className="space-y-8">
-                    <h4 className="text-[11px] font-bold text-gold uppercase tracking-[2px] border-l-2 border-gold pl-3">Excellent Feedback</h4>
-                    <div className="space-y-4">
-                      <input 
-                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
-                        value={localConfig.excellentTitle}
-                        onChange={e => setLocalConfig({...localConfig, excellentTitle: e.target.value})}
-                        placeholder="Excellent Title"
-                      />
-                      <textarea 
-                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-24"
-                        value={localConfig.excellentDesc}
-                        onChange={e => setLocalConfig({...localConfig, excellentDesc: e.target.value})}
-                        placeholder="Excellent Description"
-                      />
-                    </div>
-
-                    <h4 className="text-[11px] font-bold text-[#888888] uppercase tracking-[2px] border-l-2 border-[#888888] pl-3">Pass Feedback</h4>
-                    <div className="space-y-4">
-                      <input 
-                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
-                        value={localConfig.passTitle}
-                        onChange={e => setLocalConfig({...localConfig, passTitle: e.target.value})}
-                        placeholder="Pass Title"
-                      />
-                      <textarea 
-                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-24"
-                        value={localConfig.passDesc}
-                        onChange={e => setLocalConfig({...localConfig, passDesc: e.target.value})}
-                        placeholder="Pass Description"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-8">
-                    <h4 className="text-[11px] font-bold text-red-900 uppercase tracking-[2px] border-l-2 border-red-900 pl-3">Criteria Not Met Feedback</h4>
-                    <div className="space-y-4">
-                      <input 
-                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
-                        value={localConfig.failTitle}
-                        onChange={e => setLocalConfig({...localConfig, failTitle: e.target.value})}
-                        placeholder="Fail Title"
-                      />
-                      <textarea 
-                        className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-24"
-                        value={localConfig.failDesc}
-                        onChange={e => setLocalConfig({...localConfig, failDesc: e.target.value})}
-                        placeholder="Fail Description"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+          <main className="animate-in fade-in duration-500">
+            {activeTab === 'questions' && renderQuestionsTab()}
+            {activeTab === 'submissions' && renderSubmissionsTab()}
+            {activeTab === 'settings' && renderSettingsTab()}
+          </main>
+        </div>
       </div>
-    </div>
+    </UnifiedBackground>
   );
 }

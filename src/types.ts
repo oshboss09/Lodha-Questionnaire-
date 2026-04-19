@@ -20,7 +20,6 @@ export interface Submission {
 export interface GlobalConfig {
   timerPerQuestion: number;
   themePrimary: string;
-  backgroundUrl: string;
   googleSheetsWebhookUrl: string;
   // Feedback thresholds (Percentage)
   passThreshold: number;
