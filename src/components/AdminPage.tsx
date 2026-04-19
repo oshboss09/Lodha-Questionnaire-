@@ -23,7 +23,8 @@ import {
   Layout,
   Link as LinkIcon,
   BarChart3,
-  FileText
+  FileText,
+  Download
 } from "lucide-react";
 
 interface Props {
@@ -56,6 +57,33 @@ export default function AdminPage({ config }: Props) {
     });
     return () => unsub();
   }, []);
+
+  const downloadCSV = () => {
+    const headers = ["Participant", "Department", "Score", "Timestamp"];
+    const rows = submissions.map(s => {
+      const ts = s.timestamp?.toDate ? s.timestamp.toDate().toLocaleString() : new Date(s.timestamp).toLocaleString();
+      return [
+        s.fullName,
+        s.department,
+        `${s.score}/${s.totalQuestions}`,
+        ts
+      ];
+    });
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `lumina_results_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   useEffect(() => {
     setLocalConfig(config);
@@ -242,8 +270,17 @@ export default function AdminPage({ config }: Props) {
         ) : activeTab === 'submissions' ? (
           <div className="space-y-6">
             <div className="bg-surface p-6 rounded border border-border-dark flex justify-between items-center">
-              <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{submissions.length} Total Assessments</h2>
-              <div className="text-[10px] text-[#888888] uppercase tracking-[1px]">Sorted by Most Recent</div>
+              <div className="flex flex-col gap-1">
+                <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{submissions.length} Total Assessments</h2>
+                <div className="text-[10px] text-[#888888] uppercase tracking-[1px]">Real-time evaluation records</div>
+              </div>
+              <button 
+                onClick={downloadCSV}
+                disabled={submissions.length === 0}
+                className={`lumina-btn lumina-btn-primary flex items-center gap-2 ${submissions.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+              >
+                <Download className="w-4 h-4" /> Export CSV
+              </button>
             </div>
 
             <div className="bg-surface rounded border border-border-dark overflow-hidden">
