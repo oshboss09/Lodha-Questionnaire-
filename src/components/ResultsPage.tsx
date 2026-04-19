@@ -16,7 +16,7 @@ export default function ResultsPage({ user, config }: Props) {
   const percentage = Math.round((score / total) * 100);
   
   const getFeedback = () => {
-    if (percentage >= 80) return { title: "Commanding Performance", color: "text-gold", desc: "You have demonstrated exceptional strategic intelligence." };
+    if (percentage >= 80) return { title: "Commanding Performance", color: "text-gold", desc: "You have demonstrated exceptional expertise and clarity." };
     if (percentage >= 50) return { title: "Evaluation Complete", color: "text-white", desc: "You have successfully cleared the assessment criteria." };
     return { title: "Criteria Not Met", color: "text-[#888888]", desc: "Additional evaluation or preparation is recommended." };
   };
@@ -61,13 +61,13 @@ export default function ResultsPage({ user, config }: Props) {
         <div className="grid gap-4">
           <button 
             onClick={() => window.location.href = '/'}
-            className="w-full lumina-btn lumina-btn-primary"
+            className="w-full lodha-btn lodha-btn-primary"
           >
             Retake Evaluation
           </button>
           <button 
             onClick={() => navigate('/')}
-            className="w-full lumina-btn lumina-btn-secondary"
+            className="w-full lodha-btn lodha-btn-secondary"
           >
             Exit Terminal
           </button>

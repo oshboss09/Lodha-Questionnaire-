@@ -155,7 +155,7 @@ export default function QuizPage({ user, config }: Props) {
     <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#0a0a0a]">
       {/* Header */}
       <header className="h-[80px] bg-surface border-b border-border-dark flex items-center justify-between px-10 shrink-0">
-        <div className="font-serif text-2xl tracking-[2px] text-gold uppercase">Lumina</div>
+        <div className="font-serif text-2xl tracking-[2px] text-gold uppercase">Lodha</div>
         <div className="flex items-center gap-3 bg-gold/10 border border-gold px-4 py-2 rounded">
           <span className="text-[12px] uppercase tracking-[1px] text-gold font-medium">Time Remaining</span>
           <span className="font-mono text-xl font-bold text-gold">
@@ -257,7 +257,7 @@ export default function QuizPage({ user, config }: Props) {
           <button
             disabled={selectedOption === null || isSubmitting}
             onClick={handleNext}
-            className={`lumina-btn ${selectedOption === null || isSubmitting ? 'opacity-30 cursor-not-allowed lumina-btn-secondary' : 'lumina-btn-primary'}`}
+            className={`lodha-btn ${selectedOption === null || isSubmitting ? 'opacity-30 cursor-not-allowed lodha-btn-secondary' : 'lodha-btn-primary'}`}
           >
             {isSubmitting ? "Processing..." : (currentIndex === questions.length - 1 ? "Finish Assessment" : "Next Question")}
           </button>

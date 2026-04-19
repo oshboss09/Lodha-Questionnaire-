@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import LandingPage from "./components/LandingPage";
 import QuizPage from "./components/QuizPage";
 import AdminPage from "./components/AdminPage";
+import AdminLogin from "./components/AdminLogin";
 import ResultsPage from "./components/ResultsPage";
 import { UserDetails, GlobalConfig } from "./types";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -15,6 +16,9 @@ import { db, handleFirestoreError } from "./lib/firebase";
 
 export default function App() {
   const [user, setUser] = useState<UserDetails | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    return sessionStorage.getItem("isAdmin") === "true";
+  });
   const [config, setConfig] = useState<GlobalConfig>({
     timerPerQuestion: 30,
     totalQuestions: 20,
@@ -34,6 +38,18 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  const handleAdminLogin = (success: boolean) => {
+    if (success) {
+      setIsAdmin(true);
+      sessionStorage.setItem("isAdmin", "true");
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdmin(false);
+    sessionStorage.removeItem("isAdmin");
+  };
+
   return (
     <Router>
       <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
@@ -44,7 +60,10 @@ export default function App() {
             element={user ? <QuizPage user={user} config={config} /> : <Navigate to="/" />} 
           />
           <Route path="/results" element={<ResultsPage user={user} config={config} />} />
-          <Route path="/admin" element={<AdminPage config={config} />} />
+          <Route 
+            path="/admin" 
+            element={isAdmin ? <AdminPage config={config} onLogout={handleAdminLogout} /> : <AdminLogin onLogin={handleAdminLogin} />} 
+          />
         </Routes>
       </div>
     </Router>

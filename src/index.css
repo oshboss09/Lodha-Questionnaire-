@@ -24,19 +24,19 @@
 }
 
 @layer components {
-  .lumina-card {
+  .lodha-card {
     @apply bg-surface border border-border-dark rounded-lg;
   }
   
-  .lumina-btn {
+  .lodha-btn {
     @apply px-8 py-3.5 text-[12px] uppercase tracking-[2px] rounded font-bold transition-all duration-200;
   }
   
-  .lumina-btn-primary {
+  .lodha-btn-primary {
     @apply bg-gold text-black hover:brightness-110 active:scale-[0.98];
   }
   
-  .lumina-btn-secondary {
+  .lodha-btn-secondary {
     @apply bg-transparent text-[#888888] border border-border-dark hover:border-gold/50;
   }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { format } from "date-fns";
 import { UserDetails, GlobalConfig, Question, Submission } from "../types";
 import { 
   collection, 
@@ -24,14 +25,16 @@ import {
   Link as LinkIcon,
   BarChart3,
   FileText,
-  Download
+  Download,
+  LogOut
 } from "lucide-react";
 
 interface Props {
   config: GlobalConfig;
+  onLogout: () => void;
 }
 
-export default function AdminPage({ config }: Props) {
+export default function AdminPage({ config, onLogout }: Props) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [editingQuestion, setEditingQuestion] = useState<Partial<Question> | null>(null);
@@ -61,7 +64,8 @@ export default function AdminPage({ config }: Props) {
   const downloadCSV = () => {
     const headers = ["Participant", "Department", "Score", "Timestamp"];
     const rows = submissions.map(s => {
-      const ts = s.timestamp?.toDate ? s.timestamp.toDate().toLocaleString() : new Date(s.timestamp).toLocaleString();
+      const date = s.timestamp?.toDate ? s.timestamp.toDate() : new Date(s.timestamp);
+      const ts = format(date, "dd-MMM-yyyy");
       return [
         s.fullName,
         s.department,
@@ -144,8 +148,17 @@ export default function AdminPage({ config }: Props) {
       <div className="max-w-5xl mx-auto">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-12">
           <div>
-            <h1 className="text-3xl font-serif text-white tracking-[2px] uppercase">Lumina Control</h1>
-            <p className="text-[#888888] text-[11px] uppercase tracking-[1px] mt-1">Assessment Infrastructure & Configuration</p>
+            <h1 className="text-3xl font-serif text-white tracking-[2px] uppercase">Lodha Control</h1>
+            <div className="flex items-center gap-4 mt-2">
+              <p className="text-[#888888] text-[11px] uppercase tracking-[1px]">Assessment Infrastructure</p>
+              <div className="h-3 w-px bg-border-dark"></div>
+              <button 
+                onClick={onLogout}
+                className="text-[10px] text-red-900 uppercase tracking-[1px] font-bold flex items-center gap-2 hover:text-red-700 transition-colors"
+              >
+                <LogOut className="w-3 h-3" /> Logout
+              </button>
+            </div>
           </div>
           <div className="flex bg-surface rounded p-1 border border-border-dark">
             <button 
@@ -176,7 +189,7 @@ export default function AdminPage({ config }: Props) {
               <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{questions.length} Active Records</h2>
               <button 
                 onClick={addQuestion}
-                className="lumina-btn lumina-btn-primary flex items-center gap-2"
+                className="lodha-btn lodha-btn-primary flex items-center gap-2"
               >
                 <Plus className="w-5 h-5" /> New Record
               </button>
@@ -227,7 +240,7 @@ export default function AdminPage({ config }: Props) {
 
                   <div className="flex justify-end gap-4 mt-8 pt-8 border-t border-border-dark">
                     <button onClick={() => setEditingQuestion(null)} className="px-6 py-2 text-[11px] font-bold text-[#888888] uppercase tracking-[1px]">Discard</button>
-                    <button onClick={saveQuestion} className="lumina-btn lumina-btn-primary">Apply Changes</button>
+                    <button onClick={saveQuestion} className="lodha-btn lodha-btn-primary">Apply Changes</button>
                   </div>
                 </div>
               </div>
@@ -277,7 +290,7 @@ export default function AdminPage({ config }: Props) {
               <button 
                 onClick={downloadCSV}
                 disabled={submissions.length === 0}
-                className={`lumina-btn lumina-btn-primary flex items-center gap-2 ${submissions.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                className={`lodha-btn lodha-btn-primary flex items-center gap-2 ${submissions.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
               >
                 <Download className="w-4 h-4" /> Export CSV
               </button>
@@ -311,7 +324,7 @@ export default function AdminPage({ config }: Props) {
                         <span className="text-[#555555]"> / {s.totalQuestions}</span>
                       </td>
                       <td className="p-4 text-[11px] text-[#888888] font-mono">
-                        {s.timestamp?.toDate ? s.timestamp.toDate().toLocaleString() : new Date(s.timestamp).toLocaleString()}
+                        {format(s.timestamp?.toDate ? s.timestamp.toDate() : new Date(s.timestamp), "dd-MMM-yyyy")}
                       </td>
                       <td className="p-4 text-right">
                         <button 
@@ -410,7 +423,7 @@ export default function AdminPage({ config }: Props) {
 
                 <button 
                   onClick={saveConfig}
-                  className="w-full lumina-btn lumina-btn-primary flex items-center justify-center gap-3"
+                  className="w-full lodha-btn lodha-btn-primary flex items-center justify-center gap-3"
                 >
                   <Save className="w-5 h-5" /> Commit Configuration
                 </button>

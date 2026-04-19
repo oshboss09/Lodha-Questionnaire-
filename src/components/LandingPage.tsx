@@ -36,9 +36,8 @@ export default function LandingPage({ onStart, config }: Props) {
         className="bg-surface p-12 rounded-lg border border-border-dark shadow-2xl max-w-xl w-full"
       >
         <div className="text-center mb-12">
-          <div className="font-serif text-3xl tracking-[4px] text-gold uppercase mb-6">Lumina</div>
+          <div className="font-serif text-3xl tracking-[4px] text-gold uppercase mb-6">Lodha</div>
           <h1 className="text-4xl font-serif italic text-white mb-4">Assessment Portal</h1>
-          <p className="text-[#888888] text-sm uppercase tracking-[1px]">Strategic Intelligence Evaluation</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -81,7 +80,7 @@ export default function LandingPage({ onStart, config }: Props) {
 
           <button 
             type="submit"
-            className="w-full lumina-btn lumina-btn-primary mt-4"
+            className="w-full lodha-btn lodha-btn-primary mt-4"
           >
             Start Assessment
           </button>
