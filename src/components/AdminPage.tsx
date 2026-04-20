@@ -68,12 +68,13 @@ export default function AdminPage({ config, onLogout }: Props) {
   }, []);
 
   const downloadCSV = () => {
-    const headers = ["Participant", "Department", "Score", "Timestamp"];
+    const headers = ["Participant", "Email", "Department", "Score", "Timestamp"];
     const rows = submissions.map(s => {
       const date = s.timestamp?.toDate ? s.timestamp.toDate() : new Date(s.timestamp);
       const ts = format(date, "dd-MMM-yyyy");
       return [
         s.fullName,
+        s.email,
         s.department,
         `\t${s.score}/${s.totalQuestions}`,
         ts
@@ -239,6 +240,7 @@ export default function AdminPage({ config, onLogout }: Props) {
           <thead className="bg-black/40 border-b border-border-dark">
             <tr>
               <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Participant</th>
+              <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Email</th>
               <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Department</th>
               <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Score</th>
               <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Timestamp</th>
@@ -250,15 +252,18 @@ export default function AdminPage({ config, onLogout }: Props) {
               <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
                 <td className="p-4">
                   <div className="text-white font-serif italic text-sm">{s.fullName}</div>
-                  <div className="text-[10px] text-[#888888] font-mono mt-0.5">{s.email}</div>
+                </td>
+                <td className="p-4">
+                  <div className="text-[11px] text-[#888888] font-mono">{s.email}</div>
                 </td>
                 <td className="p-4">
                   <span className="text-[#888888] text-xs uppercase tracking-[1px]">{s.department}</span>
                 </td>
                 <td className="p-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <span className="font-serif text-lg text-white">{s.score}</span>
-                    <span className="text-[#444444] text-sm">/ {s.totalQuestions}</span>
+                    <span className="text-gold font-black text-lg">/</span>
+                    <span className="text-[#888888] text-sm">{s.totalQuestions}</span>
                   </div>
                 </td>
                 <td className="p-4">

@@ -70,8 +70,10 @@ export default function ResultsPage({ user, config }: Props) {
           </motion.div>
 
           <div className="bg-black/40 rounded-lg p-10 mb-10 border border-border-dark">
-            <div className="font-serif italic text-7xl text-white mb-2 leading-none">
-              {score}<span className="text-2xl text-[#2a2a2a] mx-2 NOT-italic font-sans font-bold">/</span>{total}
+            <div className="font-serif italic text-7xl text-white mb-2 leading-none flex items-center justify-center">
+              {score}
+              <span className="text-5xl text-gold/40 mx-4 not-italic font-sans font-black">/</span>
+              <span className="text-5xl opacity-60">{total}</span>
             </div>
             <div className="text-[11px] font-bold text-gold uppercase tracking-[3px] mt-4">Calculated Score</div>
           </div>
