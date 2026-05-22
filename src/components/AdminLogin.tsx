@@ -12,7 +12,7 @@ export default function AdminLogin({ onLogin }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username === "admin" && password === "jaya@bachan_2026") {
+    if (username === "admin" && password === "read@2026") {
       onLogin(true);
       setError("");
     } else {

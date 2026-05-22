@@ -219,7 +219,7 @@ export default function QuizPage({ user, config }: Props) {
                   </h2>
 
                   <div className="flex flex-col gap-4">
-                    {currentQuestion.options.map((option, idx) => (
+                    {(currentQuestion.options || []).filter(o => o && o.trim() !== "").map((option, idx) => (
                       <button
                         key={idx}
                         onClick={() => setSelectedOption(idx)}

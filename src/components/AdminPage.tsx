@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "motion/react";
+import * as XLSX from "xlsx";
 import { UserDetails, GlobalConfig, Question, Submission } from "../types";
 import { 
   collection, 
@@ -29,7 +30,9 @@ import {
   Download,
   LogOut,
   Loader2,
-  Edit3
+  Edit3,
+  FileSpreadsheet,
+  Upload
 } from "lucide-react";
 import UnifiedBackground from "./UnifiedBackground";
 
@@ -46,6 +49,8 @@ export default function AdminPage({ config, onLogout }: Props) {
   const [localConfig, setLocalConfig] = useState<GlobalConfig>(config);
   const [isSaving, setIsSaving] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<Omit<Question, "id">[] | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "questions"), orderBy("order"));
@@ -100,14 +105,185 @@ export default function AdminPage({ config, onLogout }: Props) {
     setLocalConfig(config);
   }, [config]);
 
-  const saveQuestion = async () => {
-    if (!editingQuestion.text || !editingQuestion.options || editingQuestion.options.length < 2) return;
+  const downloadExcelTemplate = () => {
+    try {
+      const wsData = [
+        ["Question", "Option A", "Option B", "Option C", "Option D", "Option E", "Correct Answer"],
+        ["What is 2+2?", "3", "4", "5", "", "", "B"],
+        ["Which planet is closest to the Sun?", "Venus", "Mercury", "Earth", "Mars", "", "B"],
+        ["What is the capital of France?", "Berlin", "Rome", "Paris", "Madrid", "Amsterdam", "C"]
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      
+      // Auto-size columns for premium styling
+      const maxCols = [45, 20, 20, 20, 20, 20, 20];
+      ws["!cols"] = maxCols.map(w => ({ wch: w }));
+      
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Evaluation Template");
+      
+      XLSX.writeFile(wb, "lodha_questions_template.xlsx");
+    } catch (error) {
+      console.error("Template generation failed", error);
+      alert("Failed to generate Excel template. Please try again.");
+    }
+  };
+
+  const handleExcelUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = evt.target?.result;
+        if (!data) return;
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+        if (rawRows.length <= 1) {
+          alert("The uploaded Excel details seem empty. Please ensure the Excel contains headers and questions.");
+          return;
+        }
+
+        const headers = rawRows[0].map(h => h ? String(h).trim().toLowerCase() : "");
+        const questionColIdx = Math.max(0, headers.findIndex(h => h.includes("question")));
+        const correctColIdx = headers.findIndex(h => h.includes("correct"));
+
+        const parsed: Omit<Question, "id">[] = [];
+        
+        for (let i = 1; i < rawRows.length; i++) {
+          const row = rawRows[i];
+          if (!row || row.length === 0) continue;
+          
+          const qText = row[questionColIdx] ? String(row[questionColIdx]).trim() : "";
+          if (!qText) continue;
+
+          // Collect options dynamically from columns between Question and Correct Answer keys
+          const options: string[] = [];
+          for (let j = 1; j < row.length; j++) {
+            if (j === correctColIdx || j === questionColIdx) continue;
+            const val = row[j] !== undefined && row[j] !== null ? String(row[j]).trim() : "";
+            if (val !== "") {
+              options.push(val);
+            }
+          }
+
+          if (options.length < 2) {
+            continue;
+          }
+
+          const correctSel = correctColIdx !== -1 && row[correctColIdx] !== undefined && row[correctColIdx] !== null 
+            ? String(row[correctColIdx]).trim() 
+            : "A";
+          
+          let correctIndex = 0;
+          
+          // 1. Try to find if correctSel matches exactly to one of the options (case-insensitive)
+          const textMatchIndex = options.findIndex(opt => opt.toLowerCase() === correctSel.toLowerCase());
+          if (textMatchIndex !== -1) {
+            correctIndex = textMatchIndex;
+          } else {
+            // 2. Otherwise try matching as letter label A, B, C, D, E...
+            const upperSel = correctSel.toUpperCase();
+            if (upperSel.length === 1 && upperSel >= 'A' && upperSel <= 'Z') {
+              const charCode = upperSel.charCodeAt(0) - 65; // 'A' is 65 -> 0, 'B' is 66 -> 1, etc.
+              if (charCode >= 0 && charCode < options.length) {
+                correctIndex = charCode;
+              } else {
+                correctIndex = 0;
+              }
+            } else if (!isNaN(Number(correctSel))) {
+              // 3. Match 1-indexed number
+              const num = parseInt(correctSel) - 1;
+              if (num >= 0 && num < options.length) {
+                correctIndex = num;
+              } else {
+                correctIndex = 0;
+              }
+            } else {
+              correctIndex = 0;
+            }
+          }
+
+          parsed.push({
+            text: qText,
+            options,
+            correctAnswerIndex: correctIndex,
+            order: parsed.length
+          });
+        }
+
+        if (parsed.length === 0) {
+          alert("Could not parse any valid questions. Please verify column headers: Question, Option A, Option B, Option C, Option D, Option E, Correct Answer.");
+          return;
+        }
+
+        setUploadPreview(parsed);
+      } catch (err: any) {
+        console.error("Excel processing failed", err);
+        alert(`Error parsing Excel sheets: ${err.message || err}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  };
+
+  const commitImport = async () => {
+    if (!uploadPreview || uploadPreview.length === 0) return;
+    setIsImporting(true);
     
+    try {
+      const deletePromises = questions.map(q => {
+        if (q.id) {
+          return deleteDoc(doc(db, "questions", q.id));
+        }
+        return Promise.resolve();
+      });
+      await Promise.all(deletePromises);
+
+      const addPromises = uploadPreview.map(async (q, index) => {
+        const data = {
+          text: q.text,
+          options: q.options,
+          correctAnswerIndex: q.correctAnswerIndex,
+          order: index
+        };
+        return addDoc(collection(db, "questions"), data);
+      });
+      await Promise.all(addPromises);
+
+      alert(`Successfully imported ${uploadPreview.length} questions. All existing questions replaced.`);
+      setUploadPreview(null);
+    } catch (error: any) {
+      console.error("Bulk commit failed:", error);
+      alert(`Bulk database import failed: ${error.message || error}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const saveQuestion = async () => {
+    if (!editingQuestion.text || !editingQuestion.options) return;
+    
+    const cleanOptions = editingQuestion.options.map(o => o.trim()).filter(Boolean);
+    if (cleanOptions.length < 2) {
+      alert("A question must have at least 2 non-empty answer options.");
+      return;
+    }
+
+    const clampedIndex = Math.min(
+      Math.max(0, editingQuestion.correctAnswerIndex ?? 0),
+      cleanOptions.length - 1
+    );
+
     const data = {
       text: editingQuestion.text,
-      options: editingQuestion.options,
-      correctAnswerIndex: editingQuestion.correctAnswerIndex ?? 0,
-      order: editingQuestion.order ?? questions.length,
+      options: cleanOptions,
+      correctAnswerIndex: clampedIndex,
+      order: editingQuestion.order ?? questions.length
     };
 
     try {
@@ -171,12 +347,49 @@ export default function AdminPage({ config, onLogout }: Props) {
 
   const renderQuestionsTab = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-surface p-6 rounded border border-border-dark">
-        <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{questions.length} Active Records</h2>
-        <button onClick={addQuestion} className="lodha-btn lodha-btn-primary flex items-center gap-2">
-          <Plus className="w-5 h-5" /> New Record
-        </button>
+      <div className="flex flex-col lg:flex-row justify-between lg:items-center bg-surface p-6 rounded border border-border-dark gap-6">
+        <div>
+          <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{questions.length} Active Records</h2>
+          <p className="text-xs text-[#888888] mt-1 font-sans">Manage your individual evaluation question templates here.</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button onClick={addQuestion} className="lodha-btn lodha-btn-primary flex items-center gap-2">
+            <Plus className="w-4 h-4" /> New Record
+          </button>
+        </div>
       </div>
+
+      {/* Bulk Import Administration Section */}
+      <div className="bg-surface/50 p-6 rounded border border-border-dark flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
+        <div className="space-y-1">
+          <h3 className="text-xs font-bold text-gold uppercase tracking-[1.5px] flex items-center gap-2">
+            <FileSpreadsheet className="w-4 h-4 text-gold" /> Bulk Question Management
+          </h3>
+          <p className="text-[11px] text-[#888888]">
+            Download the standardized Excel template. Fill it in and upload the questionnaire.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3 w-full md:w-auto shrink-0">
+          <button 
+            onClick={downloadExcelTemplate} 
+            className="lodha-btn border border-gold/30 hover:border-gold/80 hover:bg-gold/5 text-gold flex items-center gap-2 text-[10px] uppercase font-bold"
+          >
+            <Download className="w-4 h-4" /> Download Template
+          </button>
+          
+          <label className="lodha-btn border border-gold hover:bg-gold hover:text-black text-gold flex items-center gap-2 text-[10px] uppercase font-bold cursor-pointer transition-all">
+            <Upload className="w-4 h-4" />
+            Upload File
+            <input 
+              type="file" 
+              accept=".xlsx,.xls,.csv" 
+              onChange={handleExcelUpload} 
+              className="hidden" 
+            />
+          </label>
+        </div>
+      </div>
+
       <div className="grid gap-4">
         {questions.map((q, idx) => (
           <div key={q.id} className="bg-surface p-6 rounded border border-border-dark flex gap-6 items-start group hover:border-gold/30 transition-all">
@@ -184,9 +397,31 @@ export default function AdminPage({ config, onLogout }: Props) {
               {(idx + 1).toString().padStart(2, '0')}
             </div>
             <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-3 mb-2">
+                <span className="text-[10px] text-[#888888] font-mono">
+                  {q.options?.length || 0} Choices
+                </span>
+              </div>
+              
               <h4 className="font-serif text-xl text-white mb-4 leading-relaxed">{q.text}</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4">
+                {q.options?.map((opt, oIdx) => (
+                  <div 
+                    key={oIdx} 
+                    className={`p-2.5 rounded text-xs border ${q.correctAnswerIndex === oIdx ? 'bg-gold/5 border-gold/30 text-gold' : 'bg-black/20 border-border-dark/40 text-gray-400'}`}
+                  >
+                    <span className="font-mono text-[9px] uppercase opacity-75 mr-1.5">[{String.fromCharCode(65 + oIdx)}]</span>
+                    {opt}
+                    {q.correctAnswerIndex === oIdx && (
+                      <span className="ml-1.5 text-[8px] uppercase font-bold text-gold tracking-widest pl-1.5 border-l border-gold/20">(Correct)</span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="flex gap-2">
+            
+            <div className="flex gap-2 shrink-0">
               {confirmingDeleteId === q.id ? (
                 <div className="flex items-center gap-2 bg-black/40 p-1 rounded border border-red-900/30">
                   <button 
@@ -197,7 +432,7 @@ export default function AdminPage({ config, onLogout }: Props) {
                   </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); setConfirmingDeleteId(null); }}
-                    className="bg-gray-700 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase transition-all hover:bg-gray-600"
+                    className="bg-gray-700 text-[#888888] px-3 py-1.5 rounded text-[10px] font-bold uppercase transition-all hover:bg-gray-600"
                   >
                     Cancel
                   </button>
@@ -504,39 +739,86 @@ export default function AdminPage({ config, onLogout }: Props) {
             </div>
             
             <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
-              <div>
-                <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Inquiry / Statement</label>
-                <textarea 
-                  className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-lg font-serif italic"
-                  value={editingQuestion.text}
-                  onChange={e => setEditingQuestion({...editingQuestion, text: e.target.value})}
-                  placeholder="Enter the assessment inquiry..."
-                  rows={3}
-                />
+              <div className="space-y-6">
+                <div>
+                  <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Inquiry / Statement</label>
+                  <textarea 
+                    className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm font-serif italic"
+                    value={editingQuestion.text}
+                    onChange={e => setEditingQuestion({...editingQuestion, text: e.target.value})}
+                    placeholder="Enter the assessment inquiry..."
+                    rows={3}
+                  />
+                </div>
               </div>
 
               <div className="space-y-4">
-                <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] block">Response Options</label>
-                {editingQuestion.options?.map((opt, idx) => (
-                  <div key={idx} className="flex gap-4 items-center group">
-                    <button 
-                      onClick={() => setEditingQuestion({...editingQuestion, correctAnswerIndex: idx})}
-                      className={`w-10 h-10 rounded-full border flex items-center justify-center shrink-0 transition-all ${editingQuestion.correctAnswerIndex === idx ? 'bg-gold border-gold text-black' : 'border-border-dark text-[#444444] hover:border-gold/50'}`}
-                    >
-                      {editingQuestion.correctAnswerIndex === idx ? <Check className="w-5 h-5" /> : (idx + 1)}
-                    </button>
-                    <input 
-                      className="flex-1 p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
-                      value={opt}
-                      onChange={e => {
-                        const newOps = [...(editingQuestion.options || [])];
-                        newOps[idx] = e.target.value;
-                        setEditingQuestion({...editingQuestion, options: newOps});
-                      }}
-                      placeholder={`Option ${idx + 1}`}
-                    />
-                  </div>
-                ))}
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] block">Response Options</label>
+                  <span className="text-[10px] text-gold font-mono">{editingQuestion.options?.length || 0} Dynamic Choices</span>
+                </div>
+                
+                <div className="space-y-3">
+                  {editingQuestion.options?.map((opt, idx) => (
+                    <div key={idx} className="flex gap-4 items-center group">
+                      <button 
+                        type="button"
+                        onClick={() => setEditingQuestion({...editingQuestion, correctAnswerIndex: idx})}
+                        className={`w-10 h-10 rounded-full border flex items-center justify-center shrink-0 transition-all ${editingQuestion.correctAnswerIndex === idx ? 'bg-gold border-gold text-black font-bold' : 'border-border-dark text-[#888888] hover:border-gold/50'}`}
+                        title="Mark as correct answer"
+                      >
+                        {editingQuestion.correctAnswerIndex === idx ? <Check className="w-5 h-5" /> : String.fromCharCode(65 + idx)}
+                      </button>
+                      <input 
+                        className="flex-1 p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white text-sm"
+                        value={opt}
+                        onChange={e => {
+                          const newOps = [...(editingQuestion.options || [])];
+                          newOps[idx] = e.target.value;
+                          setEditingQuestion({...editingQuestion, options: newOps});
+                        }}
+                        placeholder={`Option ${String.fromCharCode(65 + idx)}`}
+                      />
+                      {editingQuestion.options && editingQuestion.options.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newOps = (editingQuestion.options || []).filter((_, oIdx) => oIdx !== idx);
+                            let newCorrectIndex = editingQuestion.correctAnswerIndex ?? 0;
+                            if (newCorrectIndex === idx) {
+                              newCorrectIndex = 0;
+                            } else if (newCorrectIndex > idx) {
+                              newCorrectIndex = newCorrectIndex - 1;
+                            }
+                            setEditingQuestion({
+                              ...editingQuestion,
+                              options: newOps,
+                              correctAnswerIndex: newCorrectIndex
+                            });
+                          }}
+                          className="p-3 text-[#ff4444] hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors border border-transparent hover:border-red-900/40"
+                          title="Remove option"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentOptions = editingQuestion.options || [];
+                    setEditingQuestion({
+                      ...editingQuestion,
+                      options: [...currentOptions, ""]
+                    });
+                  }}
+                  className="w-full py-3 bg-black/30 hover:bg-black/60 border border-dashed border-border-dark hover:border-gold/50 rounded-lg text-gold text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 mt-4 transition-all"
+                >
+                  <Plus className="w-4 h-4" /> Add Answer Option
+                </button>
               </div>
             </div>
 
@@ -552,6 +834,89 @@ export default function AdminPage({ config, onLogout }: Props) {
                 className="lodha-btn lodha-btn-primary px-10 py-3"
               >
                 Save Record
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Excel Upload Preview Modal */}
+      {uploadPreview && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-surface border border-border-dark rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300"
+          >
+            <div className="p-8 border-b border-border-dark flex justify-between items-center bg-black/20">
+              <div>
+                <h3 className="text-sm font-bold text-gold uppercase tracking-[3px]">
+                  Confirm Bulk Sheet Upload
+                </h3>
+                <p className="text-xs text-[#888888] mt-1 font-sans">
+                  Parsed {uploadPreview.length} questions from your file. Please preview before overwriting.
+                </p>
+              </div>
+              <button 
+                onClick={() => setUploadPreview(null)}
+                className="text-[#888888] hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto">
+              {/* Critical warning message */}
+              <div className="bg-red-950/20 border border-red-900/30 rounded p-4 text-xs text-red-400 font-sans tracking-[0.5px]">
+                ⚠️ WARNING: Committing this upload will permanently DELETE all {questions.length} existing questions and replace them with the {uploadPreview.length} questions listed below. This action cannot be undone.
+              </div>
+
+              <div className="space-y-4">
+                {uploadPreview.map((pq, idx) => (
+                  <div key={idx} className="bg-black/30 border border-border-dark/60 p-5 rounded-lg flex gap-4 items-start text-left">
+                    <span className="w-8 h-8 rounded bg-gold/10 border border-gold/20 text-gold flex items-center justify-center font-serif shrink-0">
+                      {(idx + 1).toString().padStart(2, '0')}
+                    </span>
+                    <div className="flex-1 space-y-3">
+                      <h4 className="font-serif text-base italic text-white leading-relaxed">{pq.text}</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        {pq.options.map((opt, oIdx) => (
+                          <div 
+                            key={oIdx} 
+                            className={`p-2.5 rounded border ${pq.correctAnswerIndex === oIdx ? 'bg-gold/10 border-gold/40 text-gold font-medium' : 'bg-white/[0.02] border-border-dark/30 text-[#888888]'}`}
+                          >
+                            <span className="mr-1.5 opacity-60">[{String.fromCharCode(65 + oIdx)}]</span> {opt}
+                            {pq.correctAnswerIndex === oIdx && <span className="ml-1.5 text-[9px] uppercase font-bold tracking-wider text-gold opacity-80">(Correct)</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-8 bg-black/20 border-t border-border-dark flex justify-end gap-4">
+              <button 
+                onClick={() => setUploadPreview(null)}
+                disabled={isImporting}
+                className="px-8 py-3 rounded font-bold text-[10px] uppercase tracking-[2px] text-[#888888] hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={commitImport}
+                disabled={isImporting}
+                className="lodha-btn lodha-btn-primary px-10 py-3 flex items-center gap-2"
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Committing Upload...
+                  </>
+                ) : (
+                  'Proceed & Overwrite Records'
+                )}
               </button>
             </div>
           </motion.div>
