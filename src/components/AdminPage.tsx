@@ -544,49 +544,45 @@ export default function AdminPage({ config, onLogout }: Props) {
 
   const renderSettingsTab = () => (
     <div className="space-y-8">
-      <div className="grid md:grid-cols-2 gap-8">
-        <div className="bg-surface p-10 rounded border border-border-dark space-y-10">
-          <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4"><Layout className="w-5 h-5" /> System Attributes</h3>
-          
-          <div className="space-y-8">
-            <div>
-              <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Evaluation Latency (Seconds)</label>
-              <input 
-                type="number" 
-                className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
-                value={isNaN(localConfig.timerPerQuestion) ? "" : localConfig.timerPerQuestion}
-                onChange={e => {
-                  const val = parseInt(e.target.value);
-                  setLocalConfig(prev => ({...prev, timerPerQuestion: isNaN(val) ? 0 : val}));
-                }}
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Aesthetic Signature (Color)</label>
-              <div className="flex gap-6 items-center">
-                <input 
-                  type="color" 
-                  className="w-14 h-14 rounded-full border-0 cursor-pointer p-0 overflow-hidden bg-transparent"
-                  value={localConfig.themePrimary || "#c5a47e"}
-                  onChange={e => setLocalConfig(prev => ({...prev, themePrimary: e.target.value}))}
-                />
-                <span className="font-mono text-[14px] text-gold uppercase tracking-[1px]">{localConfig.themePrimary || "#c5a47e"}</span>
-              </div>
-            </div>
+      <div className="bg-surface p-10 rounded border border-border-dark space-y-10">
+        <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4"><Layout className="w-5 h-5" /> System Attributes</h3>
+        
+        <div className="grid md:grid-cols-2 gap-8">
+          <div>
+            <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Evaluation Latency (Seconds)</label>
+            <input 
+              type="number" 
+              className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
+              value={isNaN(localConfig.timerPerQuestion) ? "" : localConfig.timerPerQuestion}
+              onChange={e => {
+                const val = parseInt(e.target.value);
+                setLocalConfig(prev => ({...prev, timerPerQuestion: isNaN(val) ? 0 : val}));
+              }}
+            />
           </div>
-        </div>
 
-        <div className="bg-surface p-10 rounded border border-border-dark h-full">
-          <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4"><LinkIcon className="w-5 h-5" /> Data Transmissions</h3>
-          <div className="space-y-8 mt-10">
-            <div>
-              <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Webhook URL</label>
-              <textarea 
-                className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-32 leading-relaxed"
-                value={localConfig.googleSheetsWebhookUrl || ""}
-                onChange={e => setLocalConfig(prev => ({...prev, googleSheetsWebhookUrl: e.target.value}))}
-                placeholder="HTTPS ENDPOINT URL"
+          <div>
+            <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Font Colour</label>
+            <div className="flex gap-4 items-center">
+              <input 
+                type="color" 
+                className="w-12 h-12 rounded-full border-0 cursor-pointer p-0 overflow-hidden bg-transparent shrink-0"
+                value={localConfig.themePrimary || "#c5a47e"}
+                onChange={e => setLocalConfig(prev => ({...prev, themePrimary: e.target.value}))}
+              />
+              <input
+                type="text"
+                maxLength={7}
+                className="p-3 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono text-sm w-full uppercase"
+                placeholder="#HEXCODE"
+                value={localConfig.themePrimary || "#c5a47e"}
+                onChange={e => {
+                  let val = e.target.value;
+                  if (val && !val.startsWith("#") && /^[0-9A-Fa-f]{1,6}$/.test(val)) {
+                    val = "#" + val;
+                  }
+                  setLocalConfig(prev => ({...prev, themePrimary: val}));
+                }}
               />
             </div>
           </div>
