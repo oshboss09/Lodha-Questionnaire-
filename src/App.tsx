@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import LandingPage from "./components/LandingPage";
 import QuizPage from "./components/QuizPage";
@@ -13,6 +13,20 @@ import ResultsPage from "./components/ResultsPage";
 import { UserDetails, GlobalConfig } from "./types";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db, handleFirestoreError } from "./lib/firebase";
+
+function TitleUpdater() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname.startsWith("/admin")) {
+      document.title = "Admin Portal";
+    } else {
+      document.title = "Assessment Portal";
+    }
+  }, [location.pathname]);
+
+  return null;
+}
 
 export default function App() {
   const [user, setUser] = useState<UserDetails | null>(null);
@@ -58,6 +72,12 @@ export default function App() {
 
   return (
     <Router>
+      <TitleUpdater />
+      <style>{`
+        :root {
+          --color-gold: ${config.themePrimary || "#c5a47e"};
+        }
+      `}</style>
       <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
         <Routes>
           <Route path="/" element={<LandingPage onStart={(details) => setUser(details)} config={config} />} />

@@ -304,7 +304,7 @@ export default function AdminPage({ config, onLogout }: Props) {
       setConfirmingDeleteId(null);
     } catch (error: any) {
       console.error("Delete question failed:", error);
-      alert(`Error deleting record: ${error.message}`);
+      alert(`Error deleting question: ${error.message}`);
     }
   };
 
@@ -349,12 +349,11 @@ export default function AdminPage({ config, onLogout }: Props) {
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row justify-between lg:items-center bg-surface p-6 rounded border border-border-dark gap-6">
         <div>
-          <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{questions.length} Active Records</h2>
-          <p className="text-xs text-[#888888] mt-1 font-sans">Manage your individual evaluation question templates here.</p>
+          <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{questions.length} Questions</h2>
         </div>
         <div className="flex flex-wrap gap-3">
           <button onClick={addQuestion} className="lodha-btn lodha-btn-primary flex items-center gap-2">
-            <Plus className="w-4 h-4" /> New Record
+            <Plus className="w-4 h-4" /> New Question
           </button>
         </div>
       </div>
@@ -555,8 +554,11 @@ export default function AdminPage({ config, onLogout }: Props) {
               <input 
                 type="number" 
                 className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
-                value={localConfig.timerPerQuestion}
-                onChange={e => setLocalConfig(prev => ({...prev, timerPerQuestion: parseInt(e.target.value)}))}
+                value={isNaN(localConfig.timerPerQuestion) ? "" : localConfig.timerPerQuestion}
+                onChange={e => {
+                  const val = parseInt(e.target.value);
+                  setLocalConfig(prev => ({...prev, timerPerQuestion: isNaN(val) ? 0 : val}));
+                }}
               />
             </div>
 
@@ -566,10 +568,10 @@ export default function AdminPage({ config, onLogout }: Props) {
                 <input 
                   type="color" 
                   className="w-14 h-14 rounded-full border-0 cursor-pointer p-0 overflow-hidden bg-transparent"
-                  value={localConfig.themePrimary}
+                  value={localConfig.themePrimary || "#c5a47e"}
                   onChange={e => setLocalConfig(prev => ({...prev, themePrimary: e.target.value}))}
                 />
-                <span className="font-mono text-[14px] text-gold uppercase tracking-[1px]">{localConfig.themePrimary}</span>
+                <span className="font-mono text-[14px] text-gold uppercase tracking-[1px]">{localConfig.themePrimary || "#c5a47e"}</span>
               </div>
             </div>
           </div>
@@ -582,7 +584,7 @@ export default function AdminPage({ config, onLogout }: Props) {
               <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Webhook URL</label>
               <textarea 
                 className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-[#888888] text-xs h-32 leading-relaxed"
-                value={localConfig.googleSheetsWebhookUrl}
+                value={localConfig.googleSheetsWebhookUrl || ""}
                 onChange={e => setLocalConfig(prev => ({...prev, googleSheetsWebhookUrl: e.target.value}))}
                 placeholder="HTTPS ENDPOINT URL"
               />
@@ -604,8 +606,11 @@ export default function AdminPage({ config, onLogout }: Props) {
                 <input 
                   type="number" 
                   className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
-                  value={localConfig.excellentThreshold}
-                  onChange={e => setLocalConfig(prev => ({...prev, excellentThreshold: parseInt(e.target.value)}))}
+                  value={isNaN(localConfig.excellentThreshold) ? "" : localConfig.excellentThreshold}
+                  onChange={e => {
+                    const val = parseInt(e.target.value);
+                    setLocalConfig(prev => ({...prev, excellentThreshold: isNaN(val) ? 0 : val}));
+                  }}
                 />
               </div>
               <div>
@@ -613,8 +618,11 @@ export default function AdminPage({ config, onLogout }: Props) {
                 <input 
                   type="number" 
                   className="w-full p-4 bg-black/40 border border-border-dark rounded focus:border-gold outline-none text-white font-mono"
-                  value={localConfig.passThreshold}
-                  onChange={e => setLocalConfig(prev => ({...prev, passThreshold: parseInt(e.target.value)}))}
+                  value={isNaN(localConfig.passThreshold) ? "" : localConfig.passThreshold}
+                  onChange={e => {
+                    const val = parseInt(e.target.value);
+                    setLocalConfig(prev => ({...prev, passThreshold: isNaN(val) ? 0 : val}));
+                  }}
                 />
               </div>
             </div>
@@ -689,7 +697,7 @@ export default function AdminPage({ config, onLogout }: Props) {
         <div className="max-w-5xl mx-auto space-y-12">
           <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-surface/40 backdrop-blur-md p-6 rounded border border-border-dark">
             <div>
-              <h1 className="text-3xl font-serif text-white tracking-[2px] uppercase">Lodha Control</h1>
+              <h1 className="text-3xl font-serif text-white tracking-[2px] uppercase">Admin Portal</h1>
               <button 
                 onClick={onLogout}
                 className="text-[10px] text-red-900 uppercase tracking-[1px] font-bold flex items-center gap-2 mt-2 hover:opacity-80"
@@ -728,7 +736,7 @@ export default function AdminPage({ config, onLogout }: Props) {
           >
             <div className="p-8 border-b border-border-dark flex justify-between items-center bg-black/20">
               <h3 className="text-sm font-bold text-gold uppercase tracking-[3px]">
-                {editingQuestion.id ? 'Refine Record' : 'Create New Record'}
+                {editingQuestion.id ? 'Refine Question' : 'Create New Question'}
               </h3>
               <button 
                 onClick={() => setEditingQuestion(null)}
@@ -833,7 +841,7 @@ export default function AdminPage({ config, onLogout }: Props) {
                 onClick={saveQuestion}
                 className="lodha-btn lodha-btn-primary px-10 py-3"
               >
-                Save Record
+                Save Question
               </button>
             </div>
           </motion.div>
@@ -915,7 +923,7 @@ export default function AdminPage({ config, onLogout }: Props) {
                     Committing Upload...
                   </>
                 ) : (
-                  'Proceed & Overwrite Records'
+                  'Proceed & Overwrite Questions'
                 )}
               </button>
             </div>
