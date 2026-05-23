@@ -88,11 +88,7 @@ export default function LandingPage({ onStart, config }: Props) {
             </button>
           </form>
 
-          <div className="mt-12 pt-8 border-t border-border-dark text-center">
-            <p className="text-[10px] tracking-[2px] text-[#888888] uppercase opacity-50">
-              System Identity: Secure Assessment Environment
-            </p>
-          </div>
+
         </motion.div>
       </div>
     </UnifiedBackground>

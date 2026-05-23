@@ -74,11 +74,7 @@ export default function AdminLogin({ onLogin }: Props) {
           </button>
         </form>
 
-        <div className="mt-8 text-center">
-          <a href="/" className="text-[10px] text-[#555555] uppercase tracking-[1px] hover:text-gold transition-colors">
-            Return to Public Access
-          </a>
-        </div>
+
       </div>
     </div>
   );

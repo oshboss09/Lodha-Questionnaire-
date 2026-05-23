@@ -202,10 +202,6 @@ export default function QuizPage({ user, config }: Props) {
           {/* Content Area */}
           <section className="flex-1 p-16 md:p-20 overflow-y-auto relative">
             <div className="max-w-4xl">
-              <div className="text-[12px] uppercase tracking-[2px] text-gold mb-6">
-                Module Assessment: {user.department}
-              </div>
-
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentIndex}
