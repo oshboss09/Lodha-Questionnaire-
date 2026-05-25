@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserDetails, GlobalConfig, Question } from "../types";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +21,116 @@ export default function QuizPage({ user, config }: Props) {
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const hasSubmitted = useRef(false);
+
+  // Maintain a block ref to share freshest state with event listeners (avoiding closures)
+  const stateRef = useRef({
+    questions,
+    currentIndex,
+    selectedOption,
+    responses,
+    user,
+    config,
+  });
+
+  useEffect(() => {
+    stateRef.current = {
+      questions,
+      currentIndex,
+      selectedOption,
+      responses,
+      user,
+      config,
+    };
+  }, [questions, currentIndex, selectedOption, responses, user, config]);
+
+  // Handle mid-test exit / visibility auto-submission (Requirement 3)
+  const performAutoSubmit = useCallback(async () => {
+    if (hasSubmitted.current) return;
+
+    const { 
+      questions: currentQuestions, 
+      currentIndex: index, 
+      selectedOption: currentSel, 
+      responses: currentResponses, 
+      user: currentUser, 
+      config: currentConfig 
+    } = stateRef.current;
+
+    if (currentQuestions.length === 0) return;
+
+    // Prevent any duplicate triggers
+    hasSubmitted.current = true;
+
+    try {
+      const finalResponses = { ...currentResponses };
+      const currentQuestion = currentQuestions[index];
+      if (currentQuestion && currentSel !== null) {
+        finalResponses[currentQuestion.id!] = currentSel;
+      }
+
+      let score = 0;
+      currentQuestions.forEach(q => {
+        if (finalResponses[q.id!] === q.correctAnswerIndex) {
+          score++;
+        }
+      });
+
+      const submission = {
+        ...currentUser,
+        score,
+        totalQuestions: currentQuestions.length,
+        responses: finalResponses,
+        timestamp: serverTimestamp(),
+        auto_submitted: true,
+        status: "incomplete",
+      };
+
+      await addDoc(collection(db, "submissions"), submission);
+
+      if (currentConfig.googleSheetsWebhookUrl) {
+        await fetch("/api/submit-to-sheets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          keepalive: true,
+          body: JSON.stringify({
+            webhookUrl: currentConfig.googleSheetsWebhookUrl,
+            data: {
+              ...currentUser,
+              score,
+              totalQuestions: currentQuestions.length,
+              timestamp: new Date().toISOString(),
+              auto_submitted: true,
+              status: "incomplete",
+            }
+          })
+        });
+      }
+    } catch (e) {
+      console.error("Auto-submission background write failed:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        performAutoSubmit();
+      }
+    };
+
+    const handleBeforeUnloadSubmit = () => {
+      performAutoSubmit();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnloadSubmit);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnloadSubmit);
+    };
+  }, [performAutoSubmit]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -48,7 +158,12 @@ export default function QuizPage({ user, config }: Props) {
           [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
         
-        setQuestions(shuffled);
+        // Select exactly N questions (Requirement 5)
+        const n = config.questionsPerAssessment && config.questionsPerAssessment > 0
+          ? Math.min(config.questionsPerAssessment, shuffled.length)
+          : shuffled.length;
+
+        setQuestions(shuffled.slice(0, n));
       } catch (error) {
         handleFirestoreError(error, 'list', 'questions');
       } finally {
@@ -56,7 +171,7 @@ export default function QuizPage({ user, config }: Props) {
       }
     }
     fetchQuestions();
-  }, [config.timerPerQuestion]);
+  }, [config.timerPerQuestion, config.questionsPerAssessment]);
 
   const handleNext = useCallback(async () => {
     const currentQuestion = questions[currentIndex];
@@ -90,7 +205,10 @@ export default function QuizPage({ user, config }: Props) {
   }, [currentIndex, isLoading, isSubmitting, handleNext, config.timerPerQuestion, questions.length]);
 
   const submitResults = async (finalResponses: Record<string, number>) => {
+    if (hasSubmitted.current) return;
+    hasSubmitted.current = true;
     setIsSubmitting(true);
+
     let score = 0;
     questions.forEach(q => {
       if (finalResponses[q.id!] === q.correctAnswerIndex) {
@@ -104,6 +222,8 @@ export default function QuizPage({ user, config }: Props) {
       totalQuestions: questions.length,
       responses: finalResponses,
       timestamp: serverTimestamp(),
+      auto_submitted: false,
+      status: "complete",
     };
 
     try {
@@ -120,7 +240,9 @@ export default function QuizPage({ user, config }: Props) {
               ...user,
               score,
               totalQuestions: questions.length,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
+              auto_submitted: false,
+              status: "complete",
             }
           })
         });

@@ -36,7 +36,8 @@ service cloud.firestore {
         && data.themePrimary is string && data.themePrimary.size() <= 10
         && data.googleSheetsWebhookUrl is string && data.googleSheetsWebhookUrl.size() <= 500
         && data.passThreshold is number
-        && data.excellentThreshold is number;
+        && data.excellentThreshold is number
+        && (!('questionsPerAssessment' in data) || data.questionsPerAssessment == null || (data.questionsPerAssessment is number && data.questionsPerAssessment > 0));
     }
 
     function isValidQuestion(data) {
@@ -49,14 +50,16 @@ service cloud.firestore {
     }
 
     function isValidSubmission(data) {
-      return data.keys().hasAll(['fullName', 'department', 'email', 'score', 'totalQuestions', 'responses', 'timestamp'])
-        && data.keys().size() == 7
+      return data.keys().hasAll(['fullName', 'department', 'email', 'score', 'totalQuestions', 'responses', 'timestamp', 'auto_submitted', 'status'])
+        && data.keys().size() == 9
         && data.fullName is string && data.fullName.size() <= 200
         && data.department is string && data.department.size() <= 200
         && data.email is string && data.email.size() <= 200
         && data.score is number && data.score >= 0
         && data.totalQuestions is number && data.totalQuestions >= 0
         && data.responses is map
+        && data.auto_submitted is bool
+        && data.status is string && (data.status == 'complete' || data.status == 'incomplete')
         && (data.timestamp == request.time || data.timestamp is timestamp);
     }
 

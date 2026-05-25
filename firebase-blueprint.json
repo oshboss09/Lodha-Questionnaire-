@@ -23,9 +23,11 @@
         "score": { "type": "number" },
         "totalQuestions": { "type": "number" },
         "responses": { "type": "object" },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "timestamp": { "type": "string", "format": "date-time" },
+        "auto_submitted": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["complete", "incomplete"] }
       },
-      "required": ["fullName", "department", "email", "score", "totalQuestions", "responses", "timestamp"]
+      "required": ["fullName", "department", "email", "score", "totalQuestions", "responses", "timestamp", "auto_submitted", "status"]
     },
     "Config": {
       "title": "Config",
@@ -42,7 +44,8 @@
         "passTitle": { "type": "string" },
         "passDesc": { "type": "string" },
         "excellentTitle": { "type": "string" },
-        "excellentDesc": { "type": "string" }
+        "excellentDesc": { "type": "string" },
+        "questionsPerAssessment": { "type": "number" }
       }
     }
   },

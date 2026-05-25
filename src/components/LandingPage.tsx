@@ -3,14 +3,22 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion } from "motion/react";
 import { UserDetails, GlobalConfig } from "../types";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ClipboardList, GraduationCap, Mail, User } from "lucide-react";
 import UnifiedBackground from "./UnifiedBackground";
+import { useState, useEffect } from "react";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 const schema = z.object({
   fullName: z.string().min(2, "Full Name is required"),
-  department: z.string().min(2, "Department is required"),
-  email: z.string().email("Invalid email address"),
+  department: z.string(),
+  email: z.string()
+    .email("Invalid email address")
+    .refine(
+      (email) => email.toLowerCase().endsWith("@lodhagroup.com"),
+      "Email must end with @lodhagroup.com"
+    ),
 });
 
 interface Props {
@@ -20,12 +28,78 @@ interface Props {
 
 export default function LandingPage({ onStart, config }: Props) {
   const navigate = useNavigate();
-  const { register, handleSubmit, formState: { errors } } = useForm<UserDetails>({
-    resolver: zodResolver(schema)
+  const location = useLocation();
+
+  const prefill = location.state?.prefill as UserDetails | undefined;
+  const isBlockedFromState = location.state?.disabled === true;
+
+  const [hasTakenAssessment, setHasTakenAssessment] = useState(false);
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
+
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<UserDetails>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      fullName: prefill?.fullName || "",
+      department: "CE",
+      email: prefill?.email || "",
+    }
   });
 
+  const watchedName = watch("fullName");
+  const watchedEmail = watch("email");
+
+  useEffect(() => {
+    if (!watchedName || !watchedEmail) {
+      setHasTakenAssessment(false);
+      return;
+    }
+
+    const emailStr = watchedEmail.trim().toLowerCase();
+    const nameStr = watchedName.trim();
+
+    const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr) && emailStr.endsWith("@lodhagroup.com");
+    if (nameStr.length >= 2 && isEmailValid) {
+      let active = true;
+      const checkDuplicate = async () => {
+        setIsCheckingDuplicate(true);
+        try {
+          const q = query(
+            collection(db, "submissions"),
+            where("fullName", "==", nameStr),
+            where("email", "==", emailStr)
+          );
+          const snapshot = await getDocs(q);
+          if (active) {
+            setHasTakenAssessment(!snapshot.empty);
+          }
+        } catch (error) {
+          console.error("Error checking duplicate submission:", error);
+        } finally {
+          if (active) {
+            setIsCheckingDuplicate(false);
+          }
+        }
+      };
+
+      const timer = setTimeout(() => {
+        checkDuplicate();
+      }, 500);
+
+      return () => {
+        active = false;
+        clearTimeout(timer);
+      };
+    } else {
+      setHasTakenAssessment(false);
+    }
+  }, [watchedName, watchedEmail]);
+
+  const isBlocked = isBlockedFromState || hasTakenAssessment;
+
   const onSubmit = (data: UserDetails) => {
-    onStart(data);
+    if (isBlocked) return;
+    const finalData = { ...data, department: "CE" };
+    onStart(finalData);
     navigate("/quiz");
   };
 
@@ -61,8 +135,9 @@ export default function LandingPage({ onStart, config }: Props) {
               </label>
               <input 
                 {...register("department")}
-                placeholder="DEPARTMENT / MODULE"
-                className="w-full bg-black/40 px-6 py-4 rounded border border-border-dark focus:border-gold outline-none transition-all placeholder:text-gray-700 text-white"
+                value="CE"
+                readOnly
+                className="w-full bg-black/20 px-6 py-4 rounded border border-border-dark outline-none cursor-not-allowed text-[#888888] select-none"
               />
               {errors.department && <p className="text-red-500 text-[10px] uppercase font-bold">{errors.department.message}</p>}
             </div>
@@ -80,14 +155,24 @@ export default function LandingPage({ onStart, config }: Props) {
               {errors.email && <p className="text-red-500 text-[10px] uppercase font-bold">{errors.email.message}</p>}
             </div>
 
+            {isBlocked && (
+              <div className="bg-red-950/20 border border-red-900/40 p-4 rounded text-xs text-red-500 font-medium uppercase tracking-[1px] text-center">
+                You have already taken the assessment and cannot retake it.
+              </div>
+            )}
+
             <button 
               type="submit"
-              className="w-full lodha-btn lodha-btn-primary mt-4"
+              disabled={isBlocked || isCheckingDuplicate}
+              className={`w-full lodha-btn mt-4 font-bold uppercase transition-all ${
+                (isBlocked || isCheckingDuplicate)
+                  ? "bg-gray-800/50 text-gray-500 border-gray-700/50 cursor-not-allowed opacity-50"
+                  : "lodha-btn-primary"
+              }`}
             >
-              Start Assessment
+              {isCheckingDuplicate ? "Checking Eligibility..." : "Start Assessment"}
             </button>
           </form>
-
 
         </motion.div>
       </div>

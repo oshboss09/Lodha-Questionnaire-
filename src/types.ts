@@ -31,6 +31,7 @@ export interface GlobalConfig {
   passDesc: string;
   excellentTitle: string;
   excellentDesc: string;
+  questionsPerAssessment?: number;
 }
 
 export interface UserDetails {

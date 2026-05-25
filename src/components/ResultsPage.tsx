@@ -80,16 +80,10 @@ export default function ResultsPage({ user, config }: Props) {
 
           <div className="grid gap-4">
             <button 
-              onClick={() => window.location.href = '/'}
+              onClick={() => navigate("/", { state: { prefill: user, disabled: true } })}
               className="w-full lodha-btn lodha-btn-primary"
             >
-              Retake Evaluation
-            </button>
-            <button 
-              onClick={() => navigate('/')}
-              className="w-full lodha-btn lodha-btn-secondary"
-            >
-              Exit Terminal
+              Exit
             </button>
           </div>
 

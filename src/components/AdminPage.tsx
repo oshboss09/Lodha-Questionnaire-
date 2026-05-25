@@ -309,6 +309,18 @@ export default function AdminPage({ config, onLogout }: Props) {
   };
 
   const saveConfig = async () => {
+    const n = localConfig.questionsPerAssessment;
+    if (n !== undefined) {
+      if (!Number.isInteger(n) || n <= 0) {
+        alert("Number of questions per assessment must be a positive integer.");
+        return;
+      }
+      if (questions.length > 0 && n > questions.length) {
+        alert(`Number of questions per assessment (${n}) cannot exceed the total number of active questions in the pool (${questions.length}).`);
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       await setDoc(doc(db, "config", "global"), localConfig);
@@ -585,6 +597,45 @@ export default function AdminPage({ config, onLogout }: Props) {
                 }}
               />
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-surface p-10 rounded border border-border-dark space-y-10">
+        <h3 className="text-sm font-bold text-gold uppercase tracking-[3px] flex items-center gap-3 border-b border-border-dark pb-4">
+          <BookOpen className="w-5 h-5" /> Assessment Settings
+        </h3>
+        
+        <div className="grid md:grid-cols-2 gap-8">
+          <div>
+            <label className="text-[10px] font-bold text-[#888888] uppercase tracking-[2px] mb-3 block">Number of questions per assessment</label>
+            <input 
+              type="number" 
+              className={`w-full p-4 bg-black/40 border rounded outline-none text-white font-mono transition-all ${
+                localConfig.questionsPerAssessment !== undefined && (localConfig.questionsPerAssessment <= 0 || localConfig.questionsPerAssessment > questions.length)
+                  ? "border-red-500/70 focus:border-red-500"
+                  : "border-border-dark focus:border-gold"
+              }`}
+              placeholder={`Pool size is ${questions.length}`}
+              value={isNaN(localConfig.questionsPerAssessment ?? NaN) ? "" : localConfig.questionsPerAssessment}
+              onChange={e => {
+                const val = parseInt(e.target.value);
+                setLocalConfig(prev => ({...prev, questionsPerAssessment: isNaN(val) ? undefined : val}));
+              }}
+            />
+            {localConfig.questionsPerAssessment !== undefined && localConfig.questionsPerAssessment > questions.length && (
+              <p className="text-red-500 text-[10px] uppercase font-bold mt-2">
+                CRITICAL ERROR: Selected number ({localConfig.questionsPerAssessment}) exceeds the total number of active questions in the pool ({questions.length}).
+              </p>
+            )}
+            {localConfig.questionsPerAssessment !== undefined && localConfig.questionsPerAssessment <= 0 && (
+              <p className="text-red-500 text-[10px] uppercase font-bold mt-2">
+                CRITICAL ERROR: Number of questions must be a positive integer greater than 0.
+              </p>
+            )}
+            <p className="text-[10px] text-gray-500 mt-2 font-mono">
+              Valid range: 1 to {questions.length} (total active questions in pool).
+            </p>
           </div>
         </div>
       </div>
