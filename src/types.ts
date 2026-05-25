@@ -15,6 +15,8 @@ export interface Submission {
   totalQuestions: number;
   responses: Record<string, number>; // questionId -> selectedIndex
   timestamp: any;
+  status?: string;
+  auto_submitted?: boolean;
 }
 
 export interface GlobalConfig {

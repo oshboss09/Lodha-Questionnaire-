@@ -25,7 +25,7 @@
         "responses": { "type": "object" },
         "timestamp": { "type": "string", "format": "date-time" },
         "auto_submitted": { "type": "boolean" },
-        "status": { "type": "string", "enum": ["complete", "incomplete"] }
+        "status": { "type": "string", "enum": ["complete", "incomplete", "Complete", "Incomplete"] }
       },
       "required": ["fullName", "department", "email", "score", "totalQuestions", "responses", "timestamp", "auto_submitted", "status"]
     },

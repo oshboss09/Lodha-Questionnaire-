@@ -59,7 +59,7 @@ service cloud.firestore {
         && data.totalQuestions is number && data.totalQuestions >= 0
         && data.responses is map
         && data.auto_submitted is bool
-        && data.status is string && (data.status == 'complete' || data.status == 'incomplete')
+        && data.status is string && (data.status == 'complete' || data.status == 'incomplete' || data.status == 'Complete' || data.status == 'Incomplete')
         && (data.timestamp == request.time || data.timestamp is timestamp);
     }
 

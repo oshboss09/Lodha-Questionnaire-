@@ -45,9 +45,12 @@ export default function QuizPage({ user, config }: Props) {
     };
   }, [questions, currentIndex, selectedOption, responses, user, config]);
 
-  // Handle mid-test exit / visibility auto-submission (Requirement 3)
-  const performAutoSubmit = useCallback(async () => {
-    if (hasSubmitted.current) return;
+  const isFocusLost = useRef(false);
+
+  // Handle focus loss handling & partial submission (Requirement 3 - Revised)
+  const performFocusLossSnapshot = useCallback(async () => {
+    if (isFocusLost.current || hasSubmitted.current) return;
+    isFocusLost.current = true;
 
     const { 
       questions: currentQuestions, 
@@ -59,9 +62,6 @@ export default function QuizPage({ user, config }: Props) {
     } = stateRef.current;
 
     if (currentQuestions.length === 0) return;
-
-    // Prevent any duplicate triggers
-    hasSubmitted.current = true;
 
     try {
       const finalResponses = { ...currentResponses };
@@ -84,7 +84,7 @@ export default function QuizPage({ user, config }: Props) {
         responses: finalResponses,
         timestamp: serverTimestamp(),
         auto_submitted: true,
-        status: "incomplete",
+        status: "Incomplete",
       };
 
       await addDoc(collection(db, "submissions"), submission);
@@ -102,35 +102,29 @@ export default function QuizPage({ user, config }: Props) {
               totalQuestions: currentQuestions.length,
               timestamp: new Date().toISOString(),
               auto_submitted: true,
-              status: "incomplete",
+              status: "Incomplete",
             }
           })
         });
       }
     } catch (e) {
-      console.error("Auto-submission background write failed:", e);
+      console.error("Focus loss snapshot recording failed:", e);
     }
   }, []);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        performAutoSubmit();
+        performFocusLossSnapshot();
       }
     };
 
-    const handleBeforeUnloadSubmit = () => {
-      performAutoSubmit();
-    };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("beforeunload", handleBeforeUnloadSubmit);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("beforeunload", handleBeforeUnloadSubmit);
     };
-  }, [performAutoSubmit]);
+  }, [performFocusLossSnapshot]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -216,6 +210,14 @@ export default function QuizPage({ user, config }: Props) {
       }
     });
 
+    if (isFocusLost.current) {
+      // SILENTLY IGNORE writing to the database!
+      // Navigate normally, pretending everything is fine
+      setIsSubmitting(false);
+      navigate("/results", { state: { score, total: questions.length } });
+      return;
+    }
+
     const submission = {
       ...user,
       score,
@@ -223,7 +225,7 @@ export default function QuizPage({ user, config }: Props) {
       responses: finalResponses,
       timestamp: serverTimestamp(),
       auto_submitted: false,
-      status: "complete",
+      status: "Complete",
     };
 
     try {
@@ -242,7 +244,7 @@ export default function QuizPage({ user, config }: Props) {
               totalQuestions: questions.length,
               timestamp: new Date().toISOString(),
               auto_submitted: false,
-              status: "complete",
+              status: "Complete",
             }
           })
         });

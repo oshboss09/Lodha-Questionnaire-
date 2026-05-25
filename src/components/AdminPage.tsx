@@ -73,15 +73,17 @@ export default function AdminPage({ config, onLogout }: Props) {
   }, []);
 
   const downloadCSV = () => {
-    const headers = ["Participant", "Email", "Department", "Score", "Timestamp"];
+    const headers = ["Participant", "Email", "Department", "Score", "Status", "Timestamp"];
     const rows = submissions.map(s => {
       const date = s.timestamp?.toDate ? s.timestamp.toDate() : new Date(s.timestamp);
       const ts = format(date, "dd-MMM-yyyy");
+      const isComp = s.status?.toLowerCase() === "complete";
       return [
         s.fullName,
         s.email,
         s.department,
         `\t${s.score}/${s.totalQuestions}`,
+        isComp ? "Complete" : "Incomplete",
         ts
       ];
     });
@@ -489,34 +491,46 @@ export default function AdminPage({ config, onLogout }: Props) {
               <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Email</th>
               <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Department</th>
               <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Score</th>
+              <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Status</th>
               <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Timestamp</th>
               <th className="p-4 w-16"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-dark/50">
-            {submissions.map((s) => (
-              <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
-                <td className="p-4">
-                  <div className="text-white font-serif italic text-sm">{s.fullName}</div>
-                </td>
-                <td className="p-4">
-                  <div className="text-[11px] text-[#888888] font-mono">{s.email}</div>
-                </td>
-                <td className="p-4">
-                  <span className="text-[#888888] text-xs uppercase tracking-[1px]">{s.department}</span>
-                </td>
-                <td className="p-4">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-serif text-lg text-white">{s.score}</span>
-                    <span className="text-gold font-black text-lg">/</span>
-                    <span className="text-[#888888] text-sm">{s.totalQuestions}</span>
-                  </div>
-                </td>
-                <td className="p-4">
-                  <div className="text-[#888888] text-xs font-mono">
-                    {s.timestamp?.toDate ? format(s.timestamp.toDate(), "MMM dd, yyyy HH:mm") : "Pending..."}
-                  </div>
-                </td>
+            {submissions.map((s) => {
+              const isComp = s.status?.toLowerCase() === "complete";
+              return (
+                <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
+                  <td className="p-4">
+                    <div className="text-white font-serif italic text-sm">{s.fullName}</div>
+                  </td>
+                  <td className="p-4">
+                    <div className="text-[11px] text-[#888888] font-mono">{s.email}</div>
+                  </td>
+                  <td className="p-4">
+                    <span className="text-[#888888] text-xs uppercase tracking-[1px]">{s.department}</span>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-serif text-lg text-white">{s.score}</span>
+                      <span className="text-gold font-black text-lg">/</span>
+                      <span className="text-[#888888] text-sm">{s.totalQuestions}</span>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <span className={`text-[10px] uppercase font-bold tracking-[1px] px-2.5 py-1 rounded inline-block ${
+                      isComp 
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+                        : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                    }`}>
+                      {isComp ? "Complete" : "Incomplete"}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <div className="text-[#888888] text-xs font-mono">
+                      {s.timestamp?.toDate ? format(s.timestamp.toDate(), "MMM dd, yyyy HH:mm") : "Pending..."}
+                    </div>
+                  </td>
                 <td className="p-4 text-right">
                   {confirmingDeleteId === s.id ? (
                     <div className="flex items-center justify-end gap-2">
@@ -547,7 +561,7 @@ export default function AdminPage({ config, onLogout }: Props) {
                   )}
                 </td>
               </tr>
-            ))}
+            );})}
           </tbody>
         </table>
       </div>
