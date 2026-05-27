@@ -36,12 +36,12 @@ export default function LandingPage({ onStart, config }: Props) {
   const [hasTakenAssessment, setHasTakenAssessment] = useState(false);
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<UserDetails>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<UserDetails>({
     resolver: zodResolver(schema),
     defaultValues: {
       fullName: prefill?.fullName || "",
       department: "CE",
-      email: prefill?.email || "",
+      email: (prefill?.email || "").toLowerCase(),
     }
   });
 
@@ -147,12 +147,25 @@ export default function LandingPage({ onStart, config }: Props) {
                 <Mail className="w-4 h-4" /> Email Address
               </label>
               <input 
-                {...register("email")}
+                {...register("email", {
+                  onChange: (e) => {
+                    const el = e.target;
+                    const rawVal = el.value;
+                    const lowerVal = rawVal.toLowerCase();
+                    if (rawVal !== lowerVal) {
+                      const start = el.selectionStart;
+                      const end = el.selectionEnd;
+                      el.value = lowerVal;
+                      setValue("email", lowerVal, { shouldValidate: true });
+                      el.setSelectionRange(start, end);
+                    }
+                  }
+                })}
                 placeholder="PARTICIPANT EMAIL"
                 type="email"
                 className="w-full bg-black/40 px-6 py-4 rounded border border-border-dark focus:border-gold outline-none transition-all placeholder:text-gray-700 text-white"
               />
-              {errors.email && <p className="text-red-500 text-[10px] uppercase font-bold">{errors.email.message}</p>}
+              {errors.email && <p className="text-red-500 text-[10px] font-bold">{errors.email.message}</p>}
             </div>
 
             {isBlocked && (

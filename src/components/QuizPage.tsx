@@ -45,12 +45,19 @@ export default function QuizPage({ user, config }: Props) {
     };
   }, [questions, currentIndex, selectedOption, responses, user, config]);
 
+  const [showSuspiciousModal, setShowSuspiciousModal] = useState(false);
   const isFocusLost = useRef(false);
+
+  const handleDismissSuspiciousModal = () => {
+    setShowSuspiciousModal(false);
+    navigate("/", { state: { prefill: user, disabled: true } });
+  };
 
   // Handle focus loss handling & partial submission (Requirement 3 - Revised)
   const performFocusLossSnapshot = useCallback(async () => {
     if (isFocusLost.current || hasSubmitted.current) return;
     isFocusLost.current = true;
+    setShowSuspiciousModal(true);
 
     const { 
       questions: currentQuestions, 
@@ -110,7 +117,7 @@ export default function QuizPage({ user, config }: Props) {
     } catch (e) {
       console.error("Focus loss snapshot recording failed:", e);
     }
-  }, []);
+  }, [navigate, user]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -393,6 +400,33 @@ export default function QuizPage({ user, config }: Props) {
           </div>
         </footer>
       </div>
+
+      <AnimatePresence>
+        {showSuspiciousModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-md w-full bg-surface p-10 rounded border border-border-dark shadow-2xl text-center flex flex-col items-center"
+            >
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full mb-6 text-red-500 animate-pulse">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="font-serif text-2xl text-white mb-4">Suspicious Activity</h3>
+              <p className="text-[#888888] text-sm leading-relaxed mb-8">
+                Suspicious activity detected. Please contact your administrator to continue.
+              </p>
+              <button 
+                onClick={handleDismissSuspiciousModal}
+                className="w-full lodha-btn lodha-btn-primary py-3 font-semibold text-xs tracking-wider uppercase"
+              >
+                OK
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </UnifiedBackground>
   );
 }

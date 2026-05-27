@@ -1,4 +1,4 @@
-import { useState, useEffect, ChangeEvent } from "react";
+import { useState, useEffect, ChangeEvent, useRef } from "react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "motion/react";
 import * as XLSX from "xlsx";
@@ -51,6 +51,65 @@ export default function AdminPage({ config, onLogout }: Props) {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [uploadPreview, setUploadPreview] = useState<Omit<Question, "id">[] | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [isConfirmingBulk, setIsConfirmingBulk] = useState(false);
+
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const visibleIds = submissions.map(s => s.id).filter(Boolean) as string[];
+  const selectedCount = selectedIds.filter(id => visibleIds.includes(id)).length;
+  const isAllSelected = visibleIds.length > 0 && selectedCount === visibleIds.length;
+  const isSomeSelected = selectedCount > 0 && selectedCount < visibleIds.length;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = isSomeSelected;
+    }
+  }, [isSomeSelected]);
+
+  useEffect(() => {
+    if (selectedCount === 0) {
+      setIsConfirmingBulk(false);
+    }
+  }, [selectedCount]);
+
+  const handleSelectAllChange = () => {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(visibleIds);
+    }
+  };
+
+  const handleSelectRow = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(item => item !== id) 
+        : [...prev, id]
+    );
+  };
+
+  const deleteSelectedSubmissions = async () => {
+    const idsToDelete = selectedIds.filter(id => visibleIds.includes(id));
+    if (idsToDelete.length === 0) return;
+
+    setBulkDeleting(true);
+    try {
+      const deletePromises = idsToDelete.map(id => {
+        return deleteDoc(doc(db, "submissions", id));
+      });
+      await Promise.all(deletePromises);
+      setSelectedIds([]);
+      setIsConfirmingBulk(false);
+    } catch (error: any) {
+      console.error("Bulk deletion failed:", error);
+      alert(`Error during bulk deletion: ${error.message}`);
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   useEffect(() => {
     const q = query(collection(db, "questions"), orderBy("order"));
@@ -479,14 +538,57 @@ export default function AdminPage({ config, onLogout }: Props) {
     <div className="space-y-6">
       <div className="bg-surface p-6 rounded border border-border-dark flex justify-between items-center">
         <h2 className="text-sm font-bold text-gold uppercase tracking-[2px]">{submissions.length} Total Assessments</h2>
-        <button onClick={downloadCSV} className="lodha-btn lodha-btn-primary flex items-center gap-2">
-          <Download className="w-4 h-4" /> Export CSV
-        </button>
+        <div className="flex gap-3">
+          {isConfirmingBulk ? (
+            <div className="flex items-center gap-2 bg-black/40 p-1 rounded border border-red-900/30">
+              <button 
+                onClick={deleteSelectedSubmissions} 
+                disabled={bulkDeleting}
+                className="bg-red-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase hover:bg-red-700 transition-all flex items-center gap-2"
+              >
+                {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Confirm ({selectedCount})
+              </button>
+              <button 
+                onClick={() => setIsConfirmingBulk(false)}
+                disabled={bulkDeleting}
+                className="bg-gray-700 text-white px-4 py-2 rounded text-[10px] font-bold uppercase hover:bg-gray-600 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setIsConfirmingBulk(true)} 
+              disabled={selectedCount === 0}
+              className={`lodha-btn flex items-center gap-2 transition-all text-[10px] uppercase font-bold ${
+                selectedCount === 0 
+                  ? "bg-red-950/20 text-red-500/40 border border-red-950/30 cursor-not-allowed opacity-50" 
+                  : "bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-600/30"
+              }`}
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Selected ({selectedCount})
+            </button>
+          )}
+          <button onClick={downloadCSV} className="lodha-btn lodha-btn-primary flex items-center gap-2">
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+        </div>
       </div>
       <div className="bg-surface rounded border border-border-dark overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-black/40 border-b border-border-dark">
             <tr>
+              <th className="p-4 w-12 text-center">
+                <input 
+                  type="checkbox" 
+                  ref={selectAllRef}
+                  checked={isAllSelected}
+                  onChange={handleSelectAllChange}
+                  className="w-4 h-4 accent-gold bg-black/40 border-border-dark rounded cursor-pointer"
+                />
+              </th>
               <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Participant</th>
               <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Email</th>
               <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Department</th>
@@ -501,6 +603,14 @@ export default function AdminPage({ config, onLogout }: Props) {
               const isComp = s.status?.toLowerCase() === "complete";
               return (
                 <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
+                  <td className="p-4 w-12 text-center">
+                    <input 
+                      type="checkbox"
+                      checked={selectedIds.includes(s.id!)}
+                      onChange={() => handleSelectRow(s.id!)}
+                      className="w-4 h-4 accent-gold bg-black/40 border-border-dark rounded cursor-pointer"
+                    />
+                  </td>
                   <td className="p-4">
                     <div className="text-white font-serif italic text-sm">{s.fullName}</div>
                   </td>
@@ -531,37 +641,38 @@ export default function AdminPage({ config, onLogout }: Props) {
                       {s.timestamp?.toDate ? format(s.timestamp.toDate(), "MMM dd, yyyy HH:mm") : "Pending..."}
                     </div>
                   </td>
-                <td className="p-4 text-right">
-                  {confirmingDeleteId === s.id ? (
-                    <div className="flex items-center justify-end gap-2">
-                       <button 
-                        onClick={(e) => { e.stopPropagation(); deleteSubmission(s.id!); }}
-                        className="bg-red-600 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase"
-                      >
-                        Confirm
-                      </button>
+                  <td className="p-4 text-right">
+                    {confirmingDeleteId === s.id ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); deleteSubmission(s.id!); }}
+                          className="bg-red-600 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase"
+                        >
+                          Confirm
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setConfirmingDeleteId(null); }}
+                          className="bg-gray-700 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
                       <button 
-                        onClick={(e) => { e.stopPropagation(); setConfirmingDeleteId(null); }}
-                        className="bg-gray-700 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (s.id) setConfirmingDeleteId(s.id);
+                        }} 
+                        className="bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white px-4 py-2 rounded-md font-bold text-[10px] tracking-wider uppercase transition-all border border-red-600/30"
                       >
-                        Cancel
+                        Delete
                       </button>
-                    </div>
-                  ) : (
-                    <button 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (s.id) setConfirmingDeleteId(s.id);
-                      }} 
-                      className="bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white px-4 py-2 rounded-md font-bold text-[10px] tracking-wider uppercase transition-all border border-red-600/30"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </td>
-              </tr>
-            );})}
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
