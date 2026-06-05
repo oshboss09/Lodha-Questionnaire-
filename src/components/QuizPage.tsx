@@ -341,29 +341,29 @@ export default function QuizPage({ user, config }: Props) {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <h2 className="font-serif text-2xl md:text-3xl text-white mb-6 leading-[1.35] text-shadow">
+                  <h2 className="font-serif text-xl md:text-2xl text-white mb-4 leading-[1.3] text-shadow">
                     {currentQuestion.text}
                   </h2>
 
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2.5">
                     {(currentQuestion.options || []).filter(o => o && o.trim() !== "").map((option, idx) => (
                       <button
                         key={idx}
                         onClick={() => setSelectedOption(idx)}
                         className={`
-                          w-full text-left p-3.5 px-5 rounded-lg border flex items-center gap-3.5 transition-all duration-200
+                          w-full text-left p-2.5 px-4 rounded-lg border flex items-center gap-3 transition-all duration-200
                           ${selectedOption === idx 
                             ? 'border-gold bg-gold/10 backdrop-blur-md' 
                             : 'border-border-dark bg-surface/20 hover:border-gold/50 hover:bg-white/[0.05]'}
                         `}
                       >
                         <div className={`
-                          w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0
+                          w-4 h-4 rounded-full border flex items-center justify-center shrink-0
                           ${selectedOption === idx ? 'border-gold bg-gold' : 'border-border-dark'}
                         `}>
                           {selectedOption === idx && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
                         </div>
-                        <span className="text-[15px] text-[#e0e0e0] font-normal leading-relaxed">{option}</span>
+                        <span className="text-sm text-[#e0e0e0] font-normal leading-relaxed">{option}</span>
                       </button>
                     ))}
                   </div>
