@@ -294,11 +294,11 @@ export default function QuizPage({ user, config }: Props) {
     <UnifiedBackground>
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Header */}
-        <header className="h-[80px] bg-surface/80 backdrop-blur-md border-b border-border-dark flex items-center justify-between px-10 shrink-0">
-          <div className="font-serif text-2xl tracking-[2px] text-gold uppercase">Lodha</div>
-          <div className="flex items-center gap-3 bg-gold/10 border border-gold/40 px-4 py-2 rounded">
-            <span className="text-[12px] uppercase tracking-[1px] text-gold font-medium">Time Remaining</span>
-            <span className="font-mono text-xl font-bold text-gold">
+        <header className="h-[64px] bg-surface/80 backdrop-blur-md border-b border-border-dark flex items-center justify-between px-8 shrink-0">
+          <div className="font-serif text-xl tracking-[2px] text-gold uppercase">Lodha</div>
+          <div className="flex items-center gap-2.5 bg-gold/10 border border-gold/40 px-3 py-1.5 rounded">
+            <span className="text-[11px] uppercase tracking-[1px] text-gold font-medium">Time Remaining</span>
+            <span className="font-mono text-lg font-bold text-gold">
               {Math.floor(Math.max(0, timeLeft) / 60).toString().padStart(2, '0')}:
               {(Math.max(0, timeLeft) % 60).toString().padStart(2, '0')}
             </span>
@@ -308,16 +308,16 @@ export default function QuizPage({ user, config }: Props) {
         {/* Main Container */}
         <main className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
-          <aside className="w-[280px] bg-surface/40 backdrop-blur-sm border-r border-border-dark p-8 flex flex-col gap-10 shrink-0 overflow-y-auto">
-            <div className="flex flex-col gap-2">
-              <div className="text-[12px] text-[#888888] uppercase tracking-[1px]">Participant</div>
-              <div className="font-serif text-lg italic text-white">{user.fullName}</div>
-              <div className="text-[12px] text-[#888888] uppercase tracking-[1px] opacity-70">{user.department}</div>
+          <aside className="w-[260px] bg-surface/40 backdrop-blur-sm border-r border-border-dark p-6 flex flex-col gap-6 shrink-0 overflow-y-auto">
+            <div className="flex flex-col gap-1.5">
+              <div className="text-[11px] text-[#888888] uppercase tracking-[1px]">Participant</div>
+              <div className="font-serif text-base italic text-white">{user.fullName}</div>
+              <div className="text-[11px] text-[#888888] uppercase tracking-[1px] opacity-70">{user.department}</div>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <div className="text-[12px] text-[#888888] uppercase tracking-[1px]">Question Navigator</div>
-              <div className="grid grid-cols-4 gap-2.5">
+            <div className="flex flex-col gap-2.5">
+              <div className="text-[11px] text-[#888888] uppercase tracking-[1px]">Question Navigator</div>
+              <div className="grid grid-cols-4 gap-2">
                 {Array.from({ length: questions.length }).map((_, idx) => (
                   <div 
                     key={idx}
@@ -331,8 +331,8 @@ export default function QuizPage({ user, config }: Props) {
           </aside>
 
           {/* Content Area */}
-          <section className="flex-1 p-16 md:p-20 overflow-y-auto relative">
-            <div className="max-w-4xl">
+          <section className="flex-1 p-8 md:p-12 overflow-y-auto relative flex items-center">
+            <div className="max-w-3xl w-full mx-auto my-auto">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentIndex}
@@ -341,29 +341,29 @@ export default function QuizPage({ user, config }: Props) {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <h2 className="font-serif text-3xl md:text-4xl text-white mb-12 leading-[1.4] text-shadow">
+                  <h2 className="font-serif text-2xl md:text-3xl text-white mb-6 leading-[1.35] text-shadow">
                     {currentQuestion.text}
                   </h2>
 
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3">
                     {(currentQuestion.options || []).filter(o => o && o.trim() !== "").map((option, idx) => (
                       <button
                         key={idx}
                         onClick={() => setSelectedOption(idx)}
                         className={`
-                          w-full text-left p-5 px-6 rounded-lg border flex items-center gap-4 transition-all duration-200
+                          w-full text-left p-3.5 px-5 rounded-lg border flex items-center gap-3.5 transition-all duration-200
                           ${selectedOption === idx 
                             ? 'border-gold bg-gold/10 backdrop-blur-md' 
                             : 'border-border-dark bg-surface/20 hover:border-gold/50 hover:bg-white/[0.05]'}
                         `}
                       >
                         <div className={`
-                          w-5 h-5 rounded-full border flex items-center justify-center shrink-0
+                          w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0
                           ${selectedOption === idx ? 'border-gold bg-gold' : 'border-border-dark'}
                         `}>
-                          {selectedOption === idx && <div className="w-2 h-2 bg-black rounded-full" />}
+                          {selectedOption === idx && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
                         </div>
-                        <span className="text-[16px] text-[#e0e0e0] font-normal leading-relaxed">{option}</span>
+                        <span className="text-[15px] text-[#e0e0e0] font-normal leading-relaxed">{option}</span>
                       </button>
                     ))}
                   </div>
@@ -374,9 +374,9 @@ export default function QuizPage({ user, config }: Props) {
         </main>
 
         {/* Footer */}
-        <footer className="h-[100px] bg-surface/80 backdrop-blur-md border-t border-border-dark flex items-center justify-between px-10 shrink-0">
-          <div className="flex flex-col gap-2 w-[400px]">
-            <div className="text-[12px] text-[#888888] uppercase tracking-[1px]">
+        <footer className="h-[80px] bg-surface/80 backdrop-blur-md border-t border-border-dark flex items-center justify-between px-8 shrink-0">
+          <div className="flex flex-col gap-1.5 w-[360px]">
+            <div className="text-[11px] text-[#888888] uppercase tracking-[1px]">
               Progress: {currentIndex + 1} of {questions.length} answered
             </div>
             <div className="h-[2px] bg-border-dark w-full rounded-full overflow-hidden">
