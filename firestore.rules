@@ -63,6 +63,13 @@ service cloud.firestore {
         && (data.timestamp == request.time || data.timestamp is timestamp);
     }
 
+    function isValidEligibleParticipant(data) {
+      return data.keys().hasAll(['email', 'createdAt'])
+        && data.keys().size() == 2
+        && data.email is string && data.email.size() <= 200
+        && (data.createdAt == request.time || data.createdAt is timestamp);
+    }
+
     // --- Collections ---
 
     // Config: Public read, Public admin write
@@ -85,6 +92,13 @@ service cloud.firestore {
       allow create: if isValidId(submissionId) && isValidSubmission(incoming());
       allow read, list: if true; 
       allow delete: if true;
+    }
+
+    // Eligible Participants: Manage allowed email addresses
+    match /eligible_participants/{email} {
+      allow read, list: if true;
+      allow create, update: if isValidId(email) && isValidEligibleParticipant(incoming());
+      allow delete: if isValidId(email);
     }
   }
 }

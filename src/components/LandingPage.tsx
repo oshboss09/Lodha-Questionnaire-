@@ -7,7 +7,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { ClipboardList, GraduationCap, Mail, User } from "lucide-react";
 import UnifiedBackground from "./UnifiedBackground";
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 const schema = z.object({
@@ -35,6 +35,8 @@ export default function LandingPage({ onStart, config }: Props) {
 
   const [hasTakenAssessment, setHasTakenAssessment] = useState(false);
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
+  const [eligibilityError, setEligibilityError] = useState<string | null>(null);
+  const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<UserDetails>({
     resolver: zodResolver(schema),
@@ -49,20 +51,46 @@ export default function LandingPage({ onStart, config }: Props) {
   const watchedEmail = watch("email");
 
   useEffect(() => {
-    if (!watchedName || !watchedEmail) {
+    if (!watchedEmail) {
+      setEligibilityError(null);
       setHasTakenAssessment(false);
       return;
     }
 
     const emailStr = watchedEmail.trim().toLowerCase();
-    const nameStr = watchedName.trim();
+    const nameStr = watchedName ? watchedName.trim() : "";
 
     const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr) && emailStr.endsWith("@lodhagroup.com");
-    if (nameStr.length >= 2 && isEmailValid) {
-      let active = true;
-      const checkDuplicate = async () => {
+
+    if (!isEmailValid) {
+      setEligibilityError(null);
+      setHasTakenAssessment(false);
+      return;
+    }
+
+    let active = true;
+
+    const performChecks = async () => {
+      setIsCheckingEligibility(true);
+      if (nameStr.length >= 2) {
         setIsCheckingDuplicate(true);
-        try {
+      }
+
+      try {
+        // 1. Check eligibility (case-insensitive)
+        const epDocRef = doc(db, "eligible_participants", emailStr);
+        const epSnap = await getDoc(epDocRef);
+
+        if (!active) return;
+
+        if (!epSnap.exists()) {
+          setEligibilityError("Invalid email address.");
+        } else {
+          setEligibilityError(null);
+        }
+
+        // 2. Check duplicate submission
+        if (nameStr.length >= 2) {
           const q = query(
             collection(db, "submissions"),
             where("fullName", "==", nameStr),
@@ -72,29 +100,32 @@ export default function LandingPage({ onStart, config }: Props) {
           if (active) {
             setHasTakenAssessment(!snapshot.empty);
           }
-        } catch (error) {
-          console.error("Error checking duplicate submission:", error);
-        } finally {
+        } else {
           if (active) {
-            setIsCheckingDuplicate(false);
+            setHasTakenAssessment(false);
           }
         }
-      };
+      } catch (error) {
+        console.error("Error making validation checks:", error);
+      } finally {
+        if (active) {
+          setIsCheckingEligibility(false);
+          setIsCheckingDuplicate(false);
+        }
+      }
+    };
 
-      const timer = setTimeout(() => {
-        checkDuplicate();
-      }, 500);
+    const timer = setTimeout(() => {
+      performChecks();
+    }, 400);
 
-      return () => {
-        active = false;
-        clearTimeout(timer);
-      };
-    } else {
-      setHasTakenAssessment(false);
-    }
-  }, [watchedName, watchedEmail]);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [watchedEmail, watchedName]);
 
-  const isBlocked = isBlockedFromState || hasTakenAssessment;
+  const isBlocked = isBlockedFromState || hasTakenAssessment || !!eligibilityError;
 
   const onSubmit = (data: UserDetails) => {
     if (isBlocked) return;
@@ -166,24 +197,31 @@ export default function LandingPage({ onStart, config }: Props) {
                 className="w-full bg-black/40 px-6 py-4 rounded border border-border-dark focus:border-gold outline-none transition-all placeholder:text-gray-700 text-white"
               />
               {errors.email && <p className="text-red-500 text-[10px] font-bold">{errors.email.message}</p>}
+              {!errors.email && eligibilityError && <p className="text-red-500 text-[10px] font-bold">{eligibilityError}</p>}
             </div>
 
-            {isBlocked && (
+            {hasTakenAssessment && (
               <div className="bg-red-950/20 border border-red-900/40 p-4 rounded text-xs text-red-500 font-medium uppercase tracking-[1px] text-center">
                 You have already taken the assessment and cannot retake it.
               </div>
             )}
 
+            {isBlockedFromState && (
+              <div className="bg-red-950/20 border border-red-900/40 p-4 rounded text-xs text-red-500 font-medium uppercase tracking-[1px] text-center">
+                Your assessment has been locked. Please contact your administrator.
+              </div>
+            )}
+
             <button 
               type="submit"
-              disabled={isBlocked || isCheckingDuplicate}
+              disabled={isBlocked || isCheckingDuplicate || isCheckingEligibility}
               className={`w-full lodha-btn mt-4 font-bold uppercase transition-all ${
-                (isBlocked || isCheckingDuplicate)
+                (isBlocked || isCheckingDuplicate || isCheckingEligibility)
                   ? "bg-gray-800/50 text-gray-500 border-gray-700/50 cursor-not-allowed opacity-50"
                   : "lodha-btn-primary"
               }`}
             >
-              {isCheckingDuplicate ? "Checking Eligibility..." : "Start Assessment"}
+              {isCheckingDuplicate || isCheckingEligibility ? "Verifying..." : "Start Assessment"}
             </button>
           </form>
 

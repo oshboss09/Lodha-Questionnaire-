@@ -2,7 +2,7 @@ import { useState, useEffect, ChangeEvent, useRef } from "react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "motion/react";
 import * as XLSX from "xlsx";
-import { UserDetails, GlobalConfig, Question, Submission } from "../types";
+import { UserDetails, GlobalConfig, Question, Submission, EligibleParticipant } from "../types";
 import { 
   collection, 
   onSnapshot, 
@@ -12,7 +12,8 @@ import {
   doc, 
   query, 
   orderBy,
-  setDoc
+  setDoc,
+  serverTimestamp
 } from "firebase/firestore";
 import { db, handleFirestoreError } from "../lib/firebase";
 import { 
@@ -32,7 +33,8 @@ import {
   Loader2,
   Edit3,
   FileSpreadsheet,
-  Upload
+  Upload,
+  UserCheck
 } from "lucide-react";
 import UnifiedBackground from "./UnifiedBackground";
 
@@ -45,7 +47,7 @@ export default function AdminPage({ config, onLogout }: Props) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [editingQuestion, setEditingQuestion] = useState<Partial<Question> | null>(null);
-  const [activeTab, setActiveTab] = useState<'questions' | 'submissions' | 'settings'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'submissions' | 'settings' | 'eligible_participants'>('questions');
   const [localConfig, setLocalConfig] = useState<GlobalConfig>(config);
   const [isSaving, setIsSaving] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
@@ -62,6 +64,52 @@ export default function AdminPage({ config, onLogout }: Props) {
   const selectedCount = selectedIds.filter(id => visibleIds.includes(id)).length;
   const isAllSelected = visibleIds.length > 0 && selectedCount === visibleIds.length;
   const isSomeSelected = selectedCount > 0 && selectedCount < visibleIds.length;
+
+  // Eligible Participants states
+  const [eligibleParticipants, setEligibleParticipants] = useState<EligibleParticipant[]>([]);
+  const [bulkInput, setBulkInput] = useState("");
+  const [invalidEmails, setInvalidEmails] = useState<string[]>([]);
+  const [isAddingEligible, setIsAddingEligible] = useState(false);
+  const [confirmingEligibleDeleteId, setConfirmingEligibleDeleteId] = useState<string | null>(null);
+
+  const [selectedEligibleIds, setSelectedEligibleIds] = useState<string[]>([]);
+  const [bulkEligibleDeleting, setBulkEligibleDeleting] = useState(false);
+  const [isConfirmingEligibleBulk, setIsConfirmingEligibleBulk] = useState(false);
+
+  const selectAllEligibleRef = useRef<HTMLInputElement>(null);
+
+  const visibleEligibleIds = eligibleParticipants.map(ep => ep.id).filter(Boolean) as string[];
+  const selectedEligibleCount = selectedEligibleIds.filter(id => visibleEligibleIds.includes(id)).length;
+  const isAllEligibleSelected = visibleEligibleIds.length > 0 && selectedEligibleCount === visibleEligibleIds.length;
+  const isSomeEligibleSelected = selectedEligibleCount > 0 && selectedEligibleCount < visibleEligibleIds.length;
+
+  useEffect(() => {
+    if (selectAllEligibleRef.current) {
+      selectAllEligibleRef.current.indeterminate = isSomeEligibleSelected;
+    }
+  }, [isSomeEligibleSelected]);
+
+  useEffect(() => {
+    if (selectedEligibleCount === 0) {
+      setIsConfirmingEligibleBulk(false);
+    }
+  }, [selectedEligibleCount]);
+
+  const handleSelectAllEligibleChange = () => {
+    if (isAllEligibleSelected) {
+      setSelectedEligibleIds([]);
+    } else {
+      setSelectedEligibleIds(visibleEligibleIds);
+    }
+  };
+
+  const handleSelectEligibleRow = (id: string) => {
+    setSelectedEligibleIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(item => item !== id) 
+        : [...prev, id]
+    );
+  };
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -130,6 +178,137 @@ export default function AdminPage({ config, onLogout }: Props) {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const epQuery = query(collection(db, "eligible_participants"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(epQuery, (snapshot) => {
+      setEligibleParticipants(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EligibleParticipant)));
+    }, (error) => {
+      handleFirestoreError(error, 'list', 'eligible_participants');
+    });
+    return () => unsub();
+  }, []);
+
+  const handleAddEligibleParticipants = async () => {
+    if (!bulkInput.trim()) return;
+    setIsAddingEligible(true);
+    setInvalidEmails([]);
+    
+    const parts = bulkInput.split(/[\n,;\t]+/);
+    const validToAdd: string[] = [];
+    const invalid: string[] = [];
+    
+    // Normal email checking regex with @lodhagroup.com domain requirement
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    parts.forEach(part => {
+      const email = part.trim().toLowerCase();
+      if (!email) return;
+      
+      if (emailRegex.test(email) && email.endsWith("@lodhagroup.com")) {
+        if (!validToAdd.includes(email)) {
+          validToAdd.push(email);
+        }
+      } else {
+        if (!invalid.includes(part.trim())) {
+          invalid.push(part.trim());
+        }
+      }
+    });
+
+    if (invalid.length > 0) {
+      setInvalidEmails(invalid);
+    }
+
+    if (validToAdd.length > 0) {
+      try {
+        const batchPromises = validToAdd.map(async (email) => {
+          const docRef = doc(db, "eligible_participants", email);
+          try {
+            await setDoc(docRef, {
+              email,
+              createdAt: serverTimestamp()
+            });
+          } catch (err: any) {
+            handleFirestoreError(err, 'create', `eligible_participants/${email}`);
+          }
+        });
+        await Promise.all(batchPromises);
+        setBulkInput("");
+        alert(`Successfully added ${validToAdd.length} eligible participants.`);
+      } catch (error: any) {
+        console.error("Error adding eligible participants:", error);
+        alert(`Failed to add eligible participants: ${error.message}`);
+      }
+    }
+    setIsAddingEligible(false);
+  };
+
+  const deleteEligibleParticipant = async (id: string) => {
+    if (!id) return;
+    try {
+      try {
+        await deleteDoc(doc(db, "eligible_participants", id));
+      } catch (err: any) {
+        handleFirestoreError(err, 'delete', `eligible_participants/${id}`);
+      }
+      setConfirmingEligibleDeleteId(null);
+    } catch (error: any) {
+      console.error("Delete eligible participant failed:", error);
+      alert(`Error deleting: ${error.message}`);
+    }
+  };
+
+  const deleteSelectedEligibleParticipants = async () => {
+    const idsToDelete = selectedEligibleIds.filter(id => visibleEligibleIds.includes(id));
+    if (idsToDelete.length === 0) return;
+
+    setBulkEligibleDeleting(true);
+    try {
+      const deletePromises = idsToDelete.map(async (id) => {
+        try {
+          await deleteDoc(doc(db, "eligible_participants", id));
+        } catch (err: any) {
+          handleFirestoreError(err, 'delete', `eligible_participants/${id}`);
+        }
+      });
+      await Promise.all(deletePromises);
+      setSelectedEligibleIds([]);
+      setIsConfirmingEligibleBulk(false);
+      alert(`Successfully deleted ${idsToDelete.length} eligible participants.`);
+    } catch (error: any) {
+      console.error("Bulk eligible deletion failed:", error);
+      alert(`Error during bulk deletion: ${error.message}`);
+    } finally {
+      setBulkEligibleDeleting(false);
+    }
+  };
+
+  const downloadEligibleCSV = () => {
+    const headers = ["Email", "Date Added"];
+    const rows = eligibleParticipants.map(ep => {
+      const date = ep.createdAt?.toDate ? ep.createdAt.toDate() : new Date(ep.createdAt);
+      const ts = format(date, "dd-MMM-yyyy HH:mm");
+      return [
+        ep.email,
+        ts
+      ];
+    });
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `eligible_participants_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const downloadCSV = () => {
     const headers = ["Participant", "Email", "Department", "Score", "Status", "Timestamp"];
@@ -863,11 +1042,186 @@ export default function AdminPage({ config, onLogout }: Props) {
     </div>
   );
 
+  const renderEligibleParticipantsTab = () => (
+    <div className="space-y-6">
+      {/* Bulk Paste Area */}
+      <div className="bg-surface p-6 rounded border border-border-dark space-y-4">
+        <h3 className="text-sm font-bold text-gold uppercase tracking-[2px] flex items-center gap-2">
+          <Plus className="w-4 h-4" /> Bulk Add Eligible Participants
+        </h3>
+        <p className="text-[11px] text-[#888888]">
+          Paste email addresses from spreadsheets or docs. Supports space, tab, comma, semicolon or newline separators. All emails will be stored in lowercase. Only emails ending with @lodhagroup.com are permitted
+        </p>
+        <textarea
+          className="w-full bg-black/40 p-4 rounded border border-border-dark focus:border-gold outline-none text-white text-sm font-mono placeholder:text-gray-700"
+          placeholder="Enter one or more emails e.g. jaya.thakur3@lodhagroup.com , sharon.moses@lodhagroup.com"
+          rows={5}
+          value={bulkInput}
+          onChange={(e) => setBulkInput(e.target.value)}
+        />
+        
+        {invalidEmails.length > 0 && (
+          <div className="bg-red-950/20 border border-red-900/30 rounded p-4 text-xs text-red-500 space-y-2">
+            <span className="font-bold uppercase tracking-[0.5px] flex items-center gap-2">
+              <X className="w-4 h-4" /> Invalid entries (ignored):
+            </span>
+            <ul className="list-disc list-inside space-y-1 font-mono text-[11px]">
+              {invalidEmails.map((email, idx) => (
+                <li key={idx}>
+                  {email} <span className="opacity-70 text-[9px] uppercase font-bold text-red-400">— Must be valid format and end with @lodhagroup.com</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button 
+            onClick={handleAddEligibleParticipants}
+            disabled={isAddingEligible || !bulkInput.trim()}
+            className="lodha-btn lodha-btn-primary flex items-center gap-2"
+          >
+            {isAddingEligible ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            Add Participants
+          </button>
+        </div>
+      </div>
+
+      {/* Toolbar & List Table */}
+      <div className="space-y-6">
+        <div className="bg-surface p-6 rounded border border-border-dark flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <h2 className="text-sm font-bold text-gold uppercase tracking-[2px] flex items-center gap-2">
+            <UserCheck className="w-4 h-4" /> {eligibleParticipants.length} Eligible Participants
+          </h2>
+          <div className="flex flex-wrap gap-3">
+            {isConfirmingEligibleBulk ? (
+              <div className="flex items-center gap-2 bg-black/40 p-1 rounded border border-red-900/30">
+                <button 
+                  onClick={deleteSelectedEligibleParticipants} 
+                  disabled={bulkEligibleDeleting}
+                  className="bg-red-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase hover:bg-red-700 transition-all flex items-center gap-1.5"
+                >
+                  {bulkEligibleDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Confirm ({selectedEligibleCount})
+                </button>
+                <button 
+                  onClick={() => setIsConfirmingEligibleBulk(false)}
+                  disabled={bulkEligibleDeleting}
+                  className="bg-gray-700 text-white px-4 py-2 rounded text-[10px] font-bold uppercase hover:bg-gray-600 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => setIsConfirmingEligibleBulk(true)} 
+                disabled={selectedEligibleCount === 0}
+                className={`lodha-btn flex items-center gap-2 transition-all text-[10px] uppercase font-bold ${
+                  selectedEligibleCount === 0 
+                    ? "bg-red-950/20 text-red-500/40 border border-red-950/30 cursor-not-allowed opacity-50" 
+                    : "bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-600/30"
+                }`}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Selected ({selectedEligibleCount})
+              </button>
+            )}
+            <button onClick={downloadEligibleCSV} className="lodha-btn lodha-btn-primary flex items-center gap-2">
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-surface rounded border border-border-dark overflow-x-auto">
+          <table className="w-full text-left min-w-[500px]">
+            <thead>
+              <tr className="border-b border-border-dark/60 bg-black/20">
+                <th className="p-4 w-12 text-center">
+                  <input 
+                    type="checkbox" 
+                    ref={selectAllEligibleRef}
+                    checked={isAllEligibleSelected}
+                    onChange={handleSelectAllEligibleChange}
+                    className="w-4 h-4 accent-gold bg-black/40 border-border-dark rounded cursor-pointer"
+                  />
+                </th>
+                <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Email address</th>
+                <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px]">Date Added</th>
+                <th className="p-4 text-[11px] font-bold text-gold uppercase tracking-[1px] text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-dark/50">
+              {eligibleParticipants.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-8 text-center text-[#888888] text-xs uppercase tracking-[1.5px] font-medium font-mono">
+                    No eligible participants configured yet. Add them in bulk above.
+                  </td>
+                </tr>
+              ) : (
+                eligibleParticipants.map((ep) => {
+                  return (
+                    <tr key={ep.id} className="hover:bg-white/[0.02] transition-colors group">
+                      <td className="p-4 w-12 text-center">
+                        <input 
+                          type="checkbox"
+                          checked={selectedEligibleIds.includes(ep.id!)}
+                          onChange={() => handleSelectEligibleRow(ep.id!)}
+                          className="w-4 h-4 accent-gold bg-black/40 border-border-dark rounded cursor-pointer"
+                        />
+                      </td>
+                      <td className="p-4">
+                        <div className="text-white font-mono text-sm">{ep.email}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-[#888888] text-xs font-mono">
+                          {ep.createdAt?.toDate ? format(ep.createdAt.toDate(), "dd-MMM-yyyy HH:mm") : ep.createdAt ? format(new Date(ep.createdAt), "dd-MMM-yyyy HH:mm") : "N/A"}
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        {confirmingEligibleDeleteId === ep.id ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); deleteEligibleParticipant(ep.id!); }}
+                              className="bg-red-600 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase transition-all hover:bg-red-700"
+                            >
+                              Confirm
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setConfirmingEligibleDeleteId(null); }}
+                              className="bg-gray-700 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase transition-all hover:bg-gray-600"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (ep.id) setConfirmingEligibleDeleteId(ep.id);
+                            }} 
+                            className="bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white px-4 py-2 rounded-md font-bold text-[10px] tracking-wider uppercase transition-all border border-red-600/30"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <UnifiedBackground>
       <div className="flex-1 p-4 md:p-8 overflow-y-auto min-h-screen">
         <div className="max-w-5xl mx-auto space-y-12">
-          <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-surface/40 backdrop-blur-md p-6 rounded border border-border-dark">
+          <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-surface/40 backdrop-blur-md p-6 rounded border border-border-dark">
             <div>
               <h1 className="text-3xl font-serif text-white tracking-[2px] uppercase">Admin Portal</h1>
               <button 
@@ -877,23 +1231,29 @@ export default function AdminPage({ config, onLogout }: Props) {
                 <LogOut className="w-3 h-3" /> Logout
               </button>
             </div>
-            <div className="flex bg-surface rounded p-1 border border-border-dark">
-              {(['questions', 'submissions', 'settings'] as const).map(tab => (
+            <div className="flex bg-surface rounded p-1 border border-border-dark flex-wrap gap-1 leading-none">
+              {([
+                { id: 'questions', name: 'questions' },
+                { id: 'submissions', name: 'submissions' },
+                { id: 'eligible_participants', name: 'Eligible Participants' },
+                { id: 'settings', name: 'settings' }
+              ] as const).map(tab => (
                  <button 
-                   key={tab}
-                   onClick={() => setActiveTab(tab)}
-                   className={`px-6 py-2 rounded font-bold text-[10px] uppercase tracking-[1px] transition-all ${activeTab === tab ? 'bg-gold text-black shadow' : 'text-[#888888] hover:bg-white/5'}`}
+                   key={tab.id}
+                   onClick={() => setActiveTab(tab.id)}
+                   className={`px-4 py-2.5 rounded font-bold text-[10px] uppercase tracking-[1px] transition-all ${activeTab === tab.id ? 'bg-gold text-black shadow' : 'text-[#888888] hover:bg-white/5'}`}
                  >
-                   {tab}
+                   {tab.name}
                  </button>
               ))}
             </div>
           </header>
-
+ 
           <main className="animate-in fade-in duration-500">
             {activeTab === 'questions' && renderQuestionsTab()}
             {activeTab === 'submissions' && renderSubmissionsTab()}
             {activeTab === 'settings' && renderSettingsTab()}
+            {activeTab === 'eligible_participants' && renderEligibleParticipantsTab()}
           </main>
         </div>
       </div>

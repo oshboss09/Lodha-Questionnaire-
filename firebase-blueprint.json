@@ -47,6 +47,16 @@
         "excellentDesc": { "type": "string" },
         "questionsPerAssessment": { "type": "number" }
       }
+    },
+    "EligibleParticipant": {
+      "title": "EligibleParticipant",
+      "description": "A participant allowed to take the assessment",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "createdAt"]
     }
   },
   "firestore": {
@@ -61,6 +71,10 @@
     "/config/global": {
       "schema": "Config",
       "description": "Global application configuration"
+    },
+    "/eligible_participants/{email}": {
+      "schema": "EligibleParticipant",
+      "description": "Collection of eligible participant email addresses"
     }
   }
 }

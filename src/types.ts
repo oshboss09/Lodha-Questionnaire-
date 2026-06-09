@@ -41,3 +41,9 @@ export interface UserDetails {
   department: string;
   email: string;
 }
+
+export interface EligibleParticipant {
+  id?: string;
+  email: string;
+  createdAt: any;
+}
