@@ -34,7 +34,19 @@ import {
   Edit3,
   FileSpreadsheet,
   Upload,
-  UserCheck
+  UserCheck,
+  Search,
+  Filter,
+  ArrowUpDown,
+  AlertTriangle,
+  Users,
+  CheckCircle2,
+  XCircle,
+  HelpCircle,
+  Percent,
+  TrendingDown,
+  PieChart,
+  Sliders
 } from "lucide-react";
 import UnifiedBackground from "./UnifiedBackground";
 
@@ -47,7 +59,16 @@ export default function AdminPage({ config, onLogout }: Props) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [editingQuestion, setEditingQuestion] = useState<Partial<Question> | null>(null);
-  const [activeTab, setActiveTab] = useState<'questions' | 'submissions' | 'settings' | 'eligible_participants'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'submissions' | 'eligible_participants' | 'analytics' | 'settings'>('questions');
+
+  // Analytics Dashboard states
+  const [passCutoff, setPassCutoff] = useState<number>(60);
+  const [analyticsSearch, setAnalyticsSearch] = useState("");
+  const [analyticsDeptFilter, setAnalyticsDeptFilter] = useState("ALL");
+  const [analyticsStatusFilter, setAnalyticsStatusFilter] = useState("ALL");
+  const [analyticsPassFilter, setAnalyticsPassFilter] = useState("ALL");
+  const [analyticsPartSort, setAnalyticsPartSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'percentage', dir: 'desc' });
+  const [analyticsQSort, setAnalyticsQSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'accuracy', dir: 'asc' });
   const [localConfig, setLocalConfig] = useState<GlobalConfig>(config);
   const [isSaving, setIsSaving] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
@@ -339,6 +360,116 @@ export default function AdminPage({ config, onLogout }: Props) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const downloadAnalyticsExcelReport = () => {
+    if (submissions.length === 0) {
+      alert("No assessment submissions available to export.");
+      return;
+    }
+
+    const sortedQuestions = [...questions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    const headers = [
+      "Participant Name",
+      "Email",
+      "Department",
+      "Status",
+      "Question No",
+      "Question Text",
+      "Shown",
+      "Answer Given",
+      "Result"
+    ];
+
+    const rows: string[][] = [];
+
+    submissions.forEach(s => {
+      const pName = s.fullName || "";
+      const email = s.email || "";
+      const dept = s.department || "";
+      const isComp = s.status?.toLowerCase() === "complete";
+      const statusText = isComp ? "Complete" : "Incomplete";
+
+      sortedQuestions.forEach((q, idx) => {
+        const qNum = `Q${idx + 1}`;
+        const qText = q.text ? q.text.replace(/\r?\n/g, " ").trim() : `Question ${idx + 1}`;
+
+        let hasKey = false;
+        let selIdx: number | undefined = undefined;
+
+        if (s.responses) {
+          if (q.id && q.id in s.responses) {
+            hasKey = true;
+            selIdx = s.responses[q.id];
+          } else if (idx.toString() in s.responses) {
+            hasKey = true;
+            selIdx = s.responses[idx.toString()];
+          } else if (String(idx) in s.responses) {
+            hasKey = true;
+            selIdx = s.responses[String(idx)];
+          }
+        }
+
+        let shown = "No";
+        let answerGiven = "Not Showed";
+        let result = "Not Showed";
+
+        if (!hasKey) {
+          shown = "No";
+          answerGiven = "Not Showed";
+          result = "Not Showed";
+        } else if (selIdx === undefined || selIdx === null || isNaN(Number(selIdx)) || Number(selIdx) < 0) {
+          shown = "Yes";
+          answerGiven = "Not Answered";
+          result = "Incorrect";
+        } else {
+          shown = "Yes";
+          const numIdx = Number(selIdx);
+          answerGiven = q.options && q.options[numIdx] !== undefined 
+            ? q.options[numIdx].replace(/\r?\n/g, " ").trim() 
+            : `Option ${numIdx + 1}`;
+          const isCorrect = numIdx === q.correctAnswerIndex;
+          result = isCorrect ? "Correct" : "Incorrect";
+        }
+
+        rows.push([
+          pName,
+          email,
+          dept,
+          statusText,
+          qNum,
+          qText,
+          shown,
+          answerGiven,
+          result
+        ]);
+      });
+    });
+
+    const aoaData = [headers, ...rows];
+    const worksheet = XLSX.utils.aoa_to_sheet(aoaData);
+
+    const colWidths = headers.map((header, colIdx) => {
+      let maxLen = header.length;
+      const sampleRows = rows.length > 500 ? rows.slice(0, 500) : rows;
+      sampleRows.forEach(row => {
+        const cellValue = String(row[colIdx] || "");
+        if (cellValue.length > maxLen) {
+          maxLen = cellValue.length;
+        }
+      });
+      return { wch: Math.min(Math.max(maxLen + 3, 12), 60) };
+    });
+
+    worksheet["!cols"] = colWidths;
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Analytics Report");
+
+    const dateStr = format(new Date(), "yyyy-MM-dd");
+    const fileName = `Analytics_Report_${dateStr}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
   };
 
   useEffect(() => {
@@ -750,8 +881,8 @@ export default function AdminPage({ config, onLogout }: Props) {
               Delete Selected ({selectedCount})
             </button>
           )}
-          <button onClick={downloadCSV} className="lodha-btn lodha-btn-primary flex items-center gap-2">
-            <Download className="w-4 h-4" /> Export CSV
+          <button onClick={downloadCSV} className="lodha-btn border border-gold/40 text-gold hover:bg-gold/10 flex items-center gap-2">
+            <Download className="w-4 h-4" /> Summary CSV
           </button>
         </div>
       </div>
@@ -1217,6 +1348,618 @@ export default function AdminPage({ config, onLogout }: Props) {
     </div>
   );
 
+  const renderAnalyticsTab = () => {
+    const totalSubmissionsCount = submissions.length;
+    const completedSubmissionsCount = submissions.filter(s => s.status?.toLowerCase() === "complete").length;
+    const incompleteSubmissionsCount = totalSubmissionsCount - completedSubmissionsCount;
+
+    // Average score and percentage
+    let totalScoreSum = 0;
+    let totalMaxScoreSum = 0;
+    let totalPctSum = 0;
+
+    submissions.forEach(s => {
+      const totalQ = s.totalQuestions || questions.length || 1;
+      const scoreNum = typeof s.score === "number" ? s.score : 0;
+      const pct = (scoreNum / totalQ) * 100;
+      totalScoreSum += scoreNum;
+      totalMaxScoreSum += totalQ;
+      totalPctSum += pct;
+    });
+
+    const avgScoreNum = totalSubmissionsCount ? (totalScoreSum / totalSubmissionsCount) : 0;
+    const avgMaxQNum = totalSubmissionsCount ? (totalMaxScoreSum / totalSubmissionsCount) : (questions.length || 1);
+    const avgPct = totalSubmissionsCount ? (totalPctSum / totalSubmissionsCount) : 0;
+
+    // Pass / Fail counts based on passCutoff
+    let passCount = 0;
+    let failCount = 0;
+
+    submissions.forEach(s => {
+      const totalQ = s.totalQuestions || questions.length || 1;
+      const scoreNum = typeof s.score === "number" ? s.score : 0;
+      const pct = (scoreNum / totalQ) * 100;
+      if (pct >= passCutoff) {
+        passCount++;
+      } else {
+        failCount++;
+      }
+    });
+
+    // Score distribution across bands: 0–20%, 21–40%, 41–60%, 61–80%, 81–100%
+    const bands = [
+      { label: "0–20%", count: 0 },
+      { label: "21–40%", count: 0 },
+      { label: "41–60%", count: 0 },
+      { label: "61–80%", count: 0 },
+      { label: "81–100%", count: 0 },
+    ];
+
+    submissions.forEach(s => {
+      const totalQ = s.totalQuestions || questions.length || 1;
+      const scoreNum = typeof s.score === "number" ? s.score : 0;
+      const pct = (scoreNum / totalQ) * 100;
+
+      if (pct <= 20) bands[0].count++;
+      else if (pct <= 40) bands[1].count++;
+      else if (pct <= 60) bands[2].count++;
+      else if (pct <= 80) bands[3].count++;
+      else bands[4].count++;
+    });
+
+    // Duplicate email check for data quality flag
+    const emailCounts: Record<string, number> = {};
+    submissions.forEach(s => {
+      const em = (s.email || "").trim().toLowerCase();
+      if (em) {
+        emailCounts[em] = (emailCounts[em] || 0) + 1;
+      }
+    });
+    const duplicateEmails = Object.entries(emailCounts)
+      .filter(([_, count]) => count > 1)
+      .map(([email, count]) => ({ email, count }));
+
+    // Questions sorted by order
+    const sortedQuestions = [...questions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    // Question stats
+    const questionStatsList = sortedQuestions.map((q, idx) => {
+      const qNum = idx + 1;
+      const qText = q.text ? q.text.replace(/\r?\n/g, " ").trim() : `Question ${qNum}`;
+      
+      let timesShown = 0;
+      let correct = 0;
+      let incorrect = 0;
+      let notAnswered = 0;
+
+      submissions.forEach(s => {
+        let hasKey = false;
+        let selIdx: number | undefined = undefined;
+
+        if (s.responses) {
+          if (q.id && q.id in s.responses) {
+            hasKey = true;
+            selIdx = s.responses[q.id];
+          } else if (idx.toString() in s.responses) {
+            hasKey = true;
+            selIdx = s.responses[idx.toString()];
+          } else if (String(idx) in s.responses) {
+            hasKey = true;
+            selIdx = s.responses[String(idx)];
+          }
+        }
+
+        if (hasKey) {
+          timesShown++;
+          if (selIdx === undefined || selIdx === null || isNaN(Number(selIdx)) || Number(selIdx) < 0) {
+            notAnswered++;
+          } else {
+            const numIdx = Number(selIdx);
+            if (numIdx === q.correctAnswerIndex) {
+              correct++;
+            } else {
+              incorrect++;
+            }
+          }
+        }
+      });
+
+      const accuracy = timesShown > 0 ? (correct / timesShown) * 100 : 0;
+
+      return {
+        q,
+        qIndex: idx,
+        qNum: `Q${qNum}`,
+        qText,
+        timesShown,
+        correct,
+        incorrect,
+        notAnswered,
+        accuracy
+      };
+    });
+
+    // Bottom 5 questions by accuracy
+    const bottom5Questions = [...questionStatsList]
+      .sort((a, b) => a.accuracy - b.accuracy)
+      .slice(0, 5);
+
+    // Filterable departments list
+    const departmentsList = Array.from(
+      new Set(submissions.map(s => s.department).filter(Boolean))
+    ).sort() as string[];
+
+    // Participant Summary rows
+    const participantRows = submissions.map(s => {
+      const totalQ = s.totalQuestions || questions.length || 1;
+      const scoreNum = typeof s.score === "number" ? s.score : 0;
+      const pct = Math.round((scoreNum / totalQ) * 100);
+      const isPass = pct >= passCutoff;
+      const statusText = s.status?.toLowerCase() === "complete" ? "Complete" : "Incomplete";
+
+      const date = s.timestamp?.toDate ? s.timestamp.toDate() : new Date(s.timestamp);
+      const formattedDate = isNaN(date.getTime()) ? "" : format(date, "dd-MMM-yyyy HH:mm");
+
+      return {
+        id: s.id,
+        fullName: s.fullName || "Unnamed",
+        email: s.email || "-",
+        department: s.department || "N/A",
+        scoreStr: `${scoreNum} / ${totalQ}`,
+        scoreNum,
+        totalQ,
+        pct,
+        passFail: isPass ? "Pass" : "Fail",
+        status: statusText,
+        submissionDate: formattedDate,
+        rawDate: isNaN(date.getTime()) ? 0 : date.getTime()
+      };
+    });
+
+    // Filtered participants
+    const filteredParticipants = participantRows.filter(p => {
+      if (analyticsSearch.trim()) {
+        const q = analyticsSearch.toLowerCase();
+        const matchName = p.fullName.toLowerCase().includes(q);
+        const matchEmail = p.email.toLowerCase().includes(q);
+        if (!matchName && !matchEmail) return false;
+      }
+      if (analyticsStatusFilter !== "ALL" && p.status !== analyticsStatusFilter) {
+        return false;
+      }
+      if (analyticsPassFilter !== "ALL" && p.passFail !== analyticsPassFilter) {
+        return false;
+      }
+      return true;
+    });
+
+    // Sorted participants
+    const sortedParticipants = [...filteredParticipants].sort((a, b) => {
+      const dir = analyticsPartSort.dir === 'asc' ? 1 : -1;
+      switch (analyticsPartSort.field) {
+        case 'fullName': return a.fullName.localeCompare(b.fullName) * dir;
+        case 'email': return a.email.localeCompare(b.email) * dir;
+        case 'score': return (a.scoreNum - b.scoreNum) * dir;
+        case 'percentage': return (a.pct - b.pct) * dir;
+        case 'passFail': return a.passFail.localeCompare(b.passFail) * dir;
+        case 'status': return a.status.localeCompare(b.status) * dir;
+        case 'submissionDate': return (a.rawDate - b.rawDate) * dir;
+        default: return 0;
+      }
+    });
+
+    // Sorted Question Analysis
+    const sortedQuestionAnalysis = [...questionStatsList].sort((a, b) => {
+      const dir = analyticsQSort.dir === 'asc' ? 1 : -1;
+      switch (analyticsQSort.field) {
+        case 'qNum': return (a.qIndex - b.qIndex) * dir;
+        case 'qText': return a.qText.localeCompare(b.qText) * dir;
+        case 'timesShown': return (a.timesShown - b.timesShown) * dir;
+        case 'correct': return (a.correct - b.correct) * dir;
+        case 'incorrect': return (a.incorrect - b.incorrect) * dir;
+        case 'notAnswered': return (a.notAnswered - b.notAnswered) * dir;
+        case 'accuracy': return (a.accuracy - b.accuracy) * dir;
+        default: return 0;
+      }
+    });
+
+    const togglePartSort = (field: string) => {
+      if (analyticsPartSort.field === field) {
+        setAnalyticsPartSort({ field, dir: analyticsPartSort.dir === 'asc' ? 'desc' : 'asc' });
+      } else {
+        setAnalyticsPartSort({ field, dir: 'asc' });
+      }
+    };
+
+    const toggleQSort = (field: string) => {
+      if (analyticsQSort.field === field) {
+        setAnalyticsQSort({ field, dir: analyticsQSort.dir === 'asc' ? 'desc' : 'asc' });
+      } else {
+        setAnalyticsQSort({ field, dir: 'asc' });
+      }
+    };
+
+    return (
+      <div className="space-y-10">
+        {/* Header Bar */}
+        <div className="bg-surface p-6 rounded border border-border-dark flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h2 className="text-sm font-bold text-gold uppercase tracking-[2px] flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-gold" />
+              Analytics Dashboard
+            </h2>
+            <p className="text-xs text-[#888888] mt-1">
+              Live performance metrics derived automatically from assessment submissions
+            </p>
+          </div>
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2 bg-black/40 border border-border-dark px-3 py-1.5 rounded">
+              <label className="text-[11px] font-bold text-[#888888] uppercase tracking-wider">Pass Cutoff (%):</label>
+              <input 
+                type="number"
+                min="0"
+                max="100"
+                value={passCutoff}
+                onChange={e => setPassCutoff(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                className="w-14 bg-black/60 border border-gold/40 rounded px-2 py-1 text-xs text-gold font-bold text-center outline-none focus:border-gold"
+              />
+            </div>
+            <button 
+              onClick={downloadAnalyticsExcelReport}
+              className="lodha-btn lodha-btn-primary flex items-center gap-2 text-xs uppercase font-bold tracking-wider"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Download Excel Report
+            </button>
+          </div>
+        </div>
+
+        {/* SECTION 1: Summary Cards & Charts */}
+        <div className="space-y-6">
+          <h3 className="text-xs font-bold text-gold uppercase tracking-[1.5px] border-b border-border-dark pb-2">
+            Section 1 — Key Performance Metrics
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Total Participants */}
+            <div className="bg-surface/60 p-5 rounded border border-border-dark/80 flex flex-col justify-between">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider">Total Participants</span>
+                <Users className="w-4 h-4 text-gold/70" />
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-bold font-mono text-white">{totalSubmissionsCount}</span>
+                <p className="text-[10px] text-[#888888] mt-1">Submissions recorded</p>
+              </div>
+            </div>
+
+            {/* Complete vs Incomplete */}
+            <div className="bg-surface/60 p-5 rounded border border-border-dark/80 flex flex-col justify-between">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider">Completion Status</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div className="mt-3">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold font-mono text-emerald-400">{completedSubmissionsCount}</span>
+                  <span className="text-xs text-[#888888]">/ {totalSubmissionsCount} Complete</span>
+                </div>
+                <p className="text-[10px] text-amber-400/80 mt-1">{incompleteSubmissionsCount} Incomplete assessments</p>
+              </div>
+            </div>
+
+            {/* Average Score */}
+            <div className="bg-surface/60 p-5 rounded border border-border-dark/80 flex flex-col justify-between">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider">Average Score</span>
+                <PieChart className="w-4 h-4 text-gold" />
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-bold font-mono text-gold">
+                  {avgScoreNum.toFixed(1)} <span className="text-sm font-sans text-[#888888]">/ {Math.round(avgMaxQNum)}</span>
+                </span>
+                <p className="text-[10px] text-gold/80 mt-1">Avg Accuracy: {avgPct.toFixed(1)}%</p>
+              </div>
+            </div>
+
+            {/* Pass vs Fail */}
+            <div className="bg-surface/60 p-5 rounded border border-border-dark/80 flex flex-col justify-between">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider">Pass / Fail (Cutoff: {passCutoff}%)</span>
+                <TrendingDown className="w-4 h-4 text-gold/70" />
+              </div>
+              <div className="mt-3 flex items-baseline justify-between">
+                <div>
+                  <span className="text-2xl font-bold font-mono text-emerald-400">{passCount}</span>
+                  <span className="text-[10px] text-emerald-400/80 block">Passed</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-2xl font-bold font-mono text-red-400">{failCount}</span>
+                  <span className="text-[10px] text-red-400/80 block">Failed</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Score Distribution Chart - Full Width */}
+          <div className="bg-surface/50 p-6 rounded border border-border-dark space-y-4">
+            <h4 className="text-xs font-bold text-gold uppercase tracking-wider flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-gold" /> Score Distribution Across Bands
+            </h4>
+            <div className="space-y-3 pt-2">
+              {bands.map((b, idx) => {
+                const bandPct = totalSubmissionsCount ? Math.round((b.count / totalSubmissionsCount) * 100) : 0;
+                return (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex justify-between text-xs font-mono text-[#888888]">
+                      <span className="text-white font-medium">{b.label}</span>
+                      <span>{b.count} participants ({bandPct}%)</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-black/60 rounded-full overflow-hidden border border-border-dark/60">
+                      <div 
+                        className="h-full bg-gradient-to-r from-gold/60 to-gold transition-all duration-500 rounded-full"
+                        style={{ width: `${Math.max(bandPct, 2)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Bottom 5 Questions Table */}
+          <div className="bg-surface/50 p-6 rounded border border-border-dark space-y-4">
+            <h4 className="text-xs font-bold text-gold uppercase tracking-wider flex items-center gap-2">
+              <TrendingDown className="w-4 h-4 text-red-400" /> Bottom 5 Questions by Accuracy (Biggest Knowledge Gaps)
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-border-dark text-[#888888] uppercase text-[10px] tracking-wider">
+                    <th className="py-2.5 px-3">Q#</th>
+                    <th className="py-2.5 px-3">Question Text</th>
+                    <th className="py-2.5 px-3 text-center">Times Shown</th>
+                    <th className="py-2.5 px-3 text-right">Accuracy %</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-dark/40">
+                  {bottom5Questions.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-4 text-center text-[#888888]">No question data available.</td>
+                    </tr>
+                  ) : (
+                    bottom5Questions.map((qStat, qIdx) => (
+                      <tr key={qIdx} className="hover:bg-white/[0.02]">
+                        <td className="py-2.5 px-3 font-mono text-gold font-bold align-top">{qStat.qNum}</td>
+                        <td className="py-2.5 px-3 text-white whitespace-normal font-serif italic leading-relaxed">{qStat.qText}</td>
+                        <td className="py-2.5 px-3 text-center font-mono text-[#888888] align-top">{qStat.timesShown}</td>
+                        <td className="py-2.5 px-3 text-right font-mono font-bold align-top">
+                          <span className={`px-2 py-0.5 rounded text-[11px] ${
+                            qStat.accuracy >= 75 
+                              ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/40' 
+                              : qStat.accuracy >= 50 
+                              ? 'bg-gold/10 text-gold border border-gold/30' 
+                              : 'bg-red-950/40 text-red-400 border border-red-800/40'
+                          }`}>
+                            {qStat.accuracy.toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 2: Question Analysis */}
+        <div className="space-y-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border-dark pb-2">
+            <div>
+              <h3 className="text-xs font-bold text-gold uppercase tracking-[1.5px]">
+                Section 2 — Comprehensive Question Analysis
+              </h3>
+              <p className="text-[11px] text-[#888888] mt-0.5">
+                Accuracy % is computed strictly among participants who were actually presented that question.
+              </p>
+            </div>
+            <span className="text-[11px] text-[#888888] font-mono">
+              {questions.length} total test questions
+            </span>
+          </div>
+
+          <div className="bg-surface rounded border border-border-dark overflow-hidden overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-black/40 border-b border-border-dark text-[#888888] uppercase text-[10px] tracking-wider">
+                  <th onClick={() => toggleQSort('qNum')} className="py-3 px-3 cursor-pointer hover:text-gold transition-colors select-none">
+                    Q# <ArrowUpDown className="w-3 h-3 inline ml-0.5 opacity-60" />
+                  </th>
+                  <th onClick={() => toggleQSort('qText')} className="py-3 px-3 cursor-pointer hover:text-gold transition-colors select-none">
+                    Question Inquiry <ArrowUpDown className="w-3 h-3 inline ml-0.5 opacity-60" />
+                  </th>
+                  <th onClick={() => toggleQSort('timesShown')} className="py-3 px-3 text-center cursor-pointer hover:text-gold transition-colors select-none">
+                    Shown <ArrowUpDown className="w-3 h-3 inline ml-0.5 opacity-60" />
+                  </th>
+                  <th onClick={() => toggleQSort('correct')} className="py-3 px-3 text-center cursor-pointer hover:text-gold transition-colors select-none">
+                    Correct <ArrowUpDown className="w-3 h-3 inline ml-0.5 opacity-60" />
+                  </th>
+                  <th onClick={() => toggleQSort('incorrect')} className="py-3 px-3 text-center cursor-pointer hover:text-gold transition-colors select-none">
+                    Incorrect <ArrowUpDown className="w-3 h-3 inline ml-0.5 opacity-60" />
+                  </th>
+                  <th onClick={() => toggleQSort('notAnswered')} className="py-3 px-3 text-center cursor-pointer hover:text-gold transition-colors select-none">
+                    Skipped <ArrowUpDown className="w-3 h-3 inline ml-0.5 opacity-60" />
+                  </th>
+                  <th onClick={() => toggleQSort('accuracy')} className="py-3 px-3 text-right cursor-pointer hover:text-gold transition-colors select-none">
+                    Accuracy % <ArrowUpDown className="w-3 h-3 inline ml-0.5 opacity-60" />
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-dark/40">
+                {sortedQuestionAnalysis.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-[#888888]">
+                      No questions configured in the system.
+                    </td>
+                  </tr>
+                ) : (
+                  sortedQuestionAnalysis.map((qs, qIdx) => (
+                    <tr key={qIdx} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 px-3 font-mono text-gold font-bold align-top">{qs.qNum}</td>
+                      <td className="py-3 px-3 text-white whitespace-normal font-serif italic leading-relaxed">{qs.qText}</td>
+                      <td className="py-3 px-3 text-center font-mono text-white font-bold align-top">{qs.timesShown}</td>
+                      <td className="py-3 px-3 text-center font-mono text-emerald-400 font-bold align-top">{qs.correct}</td>
+                      <td className="py-3 px-3 text-center font-mono text-red-400 align-top">{qs.incorrect}</td>
+                      <td className="py-3 px-3 text-center font-mono text-amber-400 align-top">{qs.notAnswered}</td>
+                      <td className="py-3 px-3 text-right align-top">
+                        <span className={`inline-block px-2.5 py-1 rounded text-[11px] font-mono font-bold border ${
+                          qs.accuracy >= 75 
+                            ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50' 
+                            : qs.accuracy >= 50 
+                            ? 'bg-gold/10 text-gold border-gold/30' 
+                            : 'bg-red-950/40 text-red-400 border-red-800/50'
+                        }`}>
+                          {qs.accuracy.toFixed(1)}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* SECTION 3: Participant Summary */}
+        <div className="space-y-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border-dark pb-2">
+            <h3 className="text-xs font-bold text-gold uppercase tracking-[1.5px]">
+              Section 3 — Participant Performance Summary
+            </h3>
+            <span className="text-[11px] text-[#888888] font-mono">
+              Showing {sortedParticipants.length} of {submissions.length} records
+            </span>
+          </div>
+
+          {/* Filters Bar */}
+          <div className="bg-surface/60 p-4 rounded border border-border-dark grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Search */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-[#888888] absolute left-3 top-3" />
+              <input 
+                type="text"
+                value={analyticsSearch}
+                onChange={e => setAnalyticsSearch(e.target.value)}
+                placeholder="Search name or email..."
+                className="w-full bg-black/40 border border-border-dark rounded pl-9 pr-3 py-2 text-xs text-white placeholder:text-gray-600 outline-none focus:border-gold"
+              />
+            </div>
+
+            {/* Status Filter */}
+            <select
+              value={analyticsStatusFilter}
+              onChange={e => setAnalyticsStatusFilter(e.target.value)}
+              className="bg-black/40 border border-border-dark rounded px-3 py-2 text-xs text-white outline-none focus:border-gold"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="Complete">Complete</option>
+              <option value="Incomplete">Incomplete</option>
+            </select>
+
+            {/* Pass/Fail Filter */}
+            <select
+              value={analyticsPassFilter}
+              onChange={e => setAnalyticsPassFilter(e.target.value)}
+              className="bg-black/40 border border-border-dark rounded px-3 py-2 text-xs text-white outline-none focus:border-gold"
+            >
+              <option value="ALL">All Results (Pass & Fail)</option>
+              <option value="Pass">Pass Only</option>
+              <option value="Fail">Fail Only</option>
+            </select>
+          </div>
+
+          {/* Participant Table */}
+          <div className="bg-surface rounded border border-border-dark overflow-hidden overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-black/40 border-b border-border-dark text-[#888888] uppercase text-[10px] tracking-wider">
+                  <th onClick={() => togglePartSort('fullName')} className="py-3 px-4 cursor-pointer hover:text-gold transition-colors select-none">
+                    Participant <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-60" />
+                  </th>
+                  <th onClick={() => togglePartSort('score')} className="py-3 px-4 text-center cursor-pointer hover:text-gold transition-colors select-none">
+                    Score <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-60" />
+                  </th>
+                  <th onClick={() => togglePartSort('percentage')} className="py-3 px-4 text-center cursor-pointer hover:text-gold transition-colors select-none">
+                    Percentage <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-60" />
+                  </th>
+                  <th onClick={() => togglePartSort('passFail')} className="py-3 px-4 text-center cursor-pointer hover:text-gold transition-colors select-none">
+                    Result <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-60" />
+                  </th>
+                  <th onClick={() => togglePartSort('status')} className="py-3 px-4 text-center cursor-pointer hover:text-gold transition-colors select-none">
+                    Status <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-60" />
+                  </th>
+                  <th onClick={() => togglePartSort('submissionDate')} className="py-3 px-4 text-right cursor-pointer hover:text-gold transition-colors select-none">
+                    Date <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-60" />
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-dark/40">
+                {sortedParticipants.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-[#888888]">
+                      No participant submissions match the current filters.
+                    </td>
+                  </tr>
+                ) : (
+                  sortedParticipants.map((p, pIdx) => (
+                    <tr key={pIdx} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-white">{p.fullName}</div>
+                        <div className="text-[10px] text-[#888888] font-mono">{p.email}</div>
+                      </td>
+                      <td className="py-3 px-4 text-center font-mono text-white font-bold">{p.scoreStr}</td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-bold font-mono border ${
+                          p.pct >= 80 
+                            ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50' 
+                            : p.pct >= 60 
+                            ? 'bg-gold/10 text-gold border-gold/30' 
+                            : 'bg-red-950/40 text-red-400 border-red-800/50'
+                        }`}>
+                          {p.pct}%
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`inline-block px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                          p.passFail === 'Pass' 
+                            ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40' 
+                            : 'bg-red-600/20 text-red-400 border-red-500/40'
+                        }`}>
+                          {p.passFail}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                          p.status === 'Complete' ? 'text-emerald-400' : 'text-amber-400'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-[#888888] text-[11px]">
+                        {p.submissionDate}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <UnifiedBackground>
       <div className="flex-1 p-4 md:p-8 overflow-y-auto min-h-screen">
@@ -1236,11 +1979,12 @@ export default function AdminPage({ config, onLogout }: Props) {
                 { id: 'questions', name: 'questions' },
                 { id: 'submissions', name: 'submissions' },
                 { id: 'eligible_participants', name: 'Eligible Participants' },
+                { id: 'analytics', name: 'Analytics Dashboard' },
                 { id: 'settings', name: 'settings' }
               ] as const).map(tab => (
                  <button 
                    key={tab.id}
-                   onClick={() => setActiveTab(tab.id)}
+                   onClick={() => setActiveTab(tab.id as any)}
                    className={`px-4 py-2.5 rounded font-bold text-[10px] uppercase tracking-[1px] transition-all ${activeTab === tab.id ? 'bg-gold text-black shadow' : 'text-[#888888] hover:bg-white/5'}`}
                  >
                    {tab.name}
@@ -1252,8 +1996,9 @@ export default function AdminPage({ config, onLogout }: Props) {
           <main className="animate-in fade-in duration-500">
             {activeTab === 'questions' && renderQuestionsTab()}
             {activeTab === 'submissions' && renderSubmissionsTab()}
-            {activeTab === 'settings' && renderSettingsTab()}
             {activeTab === 'eligible_participants' && renderEligibleParticipantsTab()}
+            {activeTab === 'analytics' && renderAnalyticsTab()}
+            {activeTab === 'settings' && renderSettingsTab()}
           </main>
         </div>
       </div>
